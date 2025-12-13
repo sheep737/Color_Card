@@ -1,63 +1,118 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>透明背景 html2canvas</title>
+<meta charset="UTF-8">
+<title>Color Cards Download</title>
 
-  <!-- html2canvas -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<!-- html2canvas -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-  <style>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+    }
+
     body {
-      font-family: sans-serif;
+        font-family: Arial, sans-serif;
+        display: inline-block;
+        padding: 40px;
     }
 
-    /* キャプチャ対象 */
     #capture-area {
-      display: inline-block;
-      padding: 20px;
-      /* 背景は指定しない or transparent */
-      background: transparent;
+        display: inline-block;
+        background: transparent;
     }
 
-    .text {
-      font-size: 24px;
-      color: #ff3366;
-      margin-bottom: 10px;
+    .card {
+        width: 350px;
+        height: 160px;
+        padding: 25px;
+        border-radius: 25px;
+        margin-bottom: 30px;
+        position: relative;
+        overflow: hidden;
     }
 
-    img {
-      width: 150px;
+    .label {
+        position: absolute;
+        bottom: 20px;
+        left: 25px;
+        color: white;
+        font-weight: bold;
+        font-size: 26px;
+        line-height: 1.2em;
     }
-  </style>
+
+    .code {
+        font-size: 20px;
+        opacity: 0.9;
+    }
+
+    .mint   { background: #B9ECFF; }
+    .silver { background: #A8D8FF; }
+    .pink   { background: #FFD0EC; }
+    .white  { background: #FFFFFF; color: #555; border: 1px solid #eee; }
+    .white .label { color: #555; }
+
+    button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+    }
+</style>
 </head>
+
 <body>
 
-  <h1>透明背景でPNGダウンロード</h1>
+<div id="capture-area">
+    <div class="card mint">
+        <div class="label">
+            MINT GREEN<br>
+            <span class="code">#B9ECE2</span>
+        </div>
+    </div>
 
-  <div id="capture-area">
-    <div class="text">サンプルテキスト</div>
-    <img src="https://via.placeholder.com/150" alt="sample image">
-  </div>
+    <div class="card silver">
+        <div class="label">
+            SILVER GREEN<br>
+            <span class="code">#A8D8FF</span>
+        </div>
+    </div>
 
-  <br><br>
-  <button onclick="download()">ダウンロード</button>
+    <div class="card pink">
+        <div class="label">
+            PINK<br>
+            <span class="code">#FFD0EC</span>
+        </div>
+    </div>
 
-  <script>
-    function download() {
-      const target = document.getElementById("capture-area");
+    <div class="card white">
+        <div class="label">
+            WHITE<br>
+            <span class="code">#FFFFFF</span>
+        </div>
+    </div>
+</div>
 
-      html2canvas(target, {
-        backgroundColor: null, // ★透明背景
-        scale: 2               // 解像度アップ（任意）
-      }).then(canvas => {
+<button onclick="downloadImage()">画像をダウンロード</button>
+
+<script>
+function downloadImage() {
+    const target = document.getElementById("capture-area");
+
+    html2canvas(target, {
+        backgroundColor: null, // 透明背景
+        scale: 2               // 高解像度
+    }).then(canvas => {
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = "transparent.png";
+        link.download = "color-cards.png";
         link.click();
-      });
-    }
-  </script>
+    });
+}
+</script>
 
 </body>
 </html>
