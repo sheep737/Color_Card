@@ -2,53 +2,58 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>html2canvas サンプル</title>
+  <title>透明背景 html2canvas</title>
 
-  <!-- html2canvas CDN -->
+  <!-- html2canvas -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
     body {
       font-family: sans-serif;
     }
+
+    /* キャプチャ対象 */
     #capture-area {
-      width: 300px;
+      display: inline-block;
       padding: 20px;
-      background: #f0f8ff;
-      border: 2px solid #4a90e2;
+      /* 背景は指定しない or transparent */
+      background: transparent;
     }
-    button {
-      margin-top: 20px;
+
+    .text {
+      font-size: 24px;
+      color: #ff3366;
+      margin-bottom: 10px;
+    }
+
+    img {
+      width: 150px;
     }
   </style>
 </head>
 <body>
 
-  <h1>html2canvas ver:1</h1>
+  <h1>透明背景でPNGダウンロード</h1>
 
   <div id="capture-area">
-    <h2>キャプチャ対象</h2>
-    <p>このエリアが画像になります。</p>
+    <div class="text">サンプルテキスト</div>
+    <img src="https://via.placeholder.com/150" alt="sample image">
   </div>
 
-  <button onclick="capture()">キャプチャして表示</button>
-
-  <h2>結果</h2>
-  <div id="result"></div>
+  <br><br>
+  <button onclick="download()">ダウンロード</button>
 
   <script>
-    function capture() {
+    function download() {
       const target = document.getElementById("capture-area");
 
-      html2canvas(target).then(canvas => {
-        // 画像として表示
-        document.getElementById("result").innerHTML = "";
-        document.getElementById("result").appendChild(canvas);
-
-        // 画像としてダウンロードしたい場合
+      html2canvas(target, {
+        backgroundColor: null, // ★透明背景
+        scale: 2               // 解像度アップ（任意）
+      }).then(canvas => {
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = "capture.png";
+        link.download = "transparent.png";
         link.click();
       });
     }
