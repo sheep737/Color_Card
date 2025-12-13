@@ -23,16 +23,17 @@
         margin-bottom: 20px;
     }
 
-    input {
+    .controls input {
         padding: 8px;
         font-size: 16px;
-        width: 140px;
+        width: 180px;
+        margin-right: 10px;
     }
 
     button {
         padding: 8px 16px;
         font-size: 16px;
-        margin-left: 10px;
+        margin-right: 5px;
     }
 
     #capture-area {
@@ -67,49 +68,53 @@
 <body>
 
 <div class="controls">
-    <label>カラーコード：</label>
-    <input id="colorInput" type="text" value="#B9ECFF">
-    <button onclick="applyColor()">反映</button>
+    <input id="labelInput" type="text" placeholder="ラベル名" value="CUSTOM COLOR">
+    <input id="colorInput" type="text" placeholder="#RRGGBB" value="#B9ECFF">
+    <button onclick="apply()">反映</button>
     <button onclick="downloadImage()">ダウンロード</button>
 </div>
 
 <div id="capture-area">
     <div id="card" class="card">
         <div class="label" id="label">
-            CUSTOM COLOR<br>
+            <span id="labelText">CUSTOM COLOR</span><br>
             <span class="code" id="codeText">#B9ECFF</span>
         </div>
     </div>
 </div>
 
 <script>
-function applyColor() {
+function apply() {
+    const labelText = document.getElementById("labelInput").value;
     const color = document.getElementById("colorInput").value;
+
     const card = document.getElementById("card");
-    const codeText = document.getElementById("codeText");
     const label = document.getElementById("label");
+    const labelSpan = document.getElementById("labelText");
+    const codeSpan = document.getElementById("codeText");
 
-    // 背景色反映
+    // 背景色
     card.style.background = color;
-    codeText.textContent = color.toUpperCase();
 
-    // 明るさで文字色を切り替え
-    const rgb = color.replace('#', '');
-    const r = parseInt(rgb.substring(0,2), 16);
-    const g = parseInt(rgb.substring(2,4), 16);
-    const b = parseInt(rgb.substring(4,6), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    // テキスト反映
+    labelSpan.textContent = labelText;
+    codeSpan.textContent = color.toUpperCase();
 
-    label.style.color = brightness > 180 ? '#555' : '#fff';
+    // 明るさで文字色切り替え
+    if (/^#([0-9A-F]{6})$/i.test(color)) {
+        const r = parseInt(color.substr(1,2),16);
+        const g = parseInt(color.substr(3,2),16);
+        const b = parseInt(color.substr(5,2),16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        label.style.color = brightness > 180 ? "#555" : "#fff";
+    }
 }
 
 // 初期反映
-applyColor();
+apply();
 
 function downloadImage() {
-    const target = document.getElementById("capture-area");
-
-    html2canvas(target, {
+    html2canvas(document.getElementById("capture-area"), {
         backgroundColor: null,
         scale: 2
     }).then(canvas => {
