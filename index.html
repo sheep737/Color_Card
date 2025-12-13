@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>html2canvas サンプル</title>
+
+  <!-- html2canvas CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    #capture-area {
+      width: 300px;
+      padding: 20px;
+      background: #f0f8ff;
+      border: 2px solid #4a90e2;
+    }
+    button {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>html2canvas デモ</h1>
+
+  <div id="capture-area">
+    <h2>キャプチャ対象</h2>
+    <p>このエリアが画像になります。</p>
+  </div>
+
+  <button onclick="capture()">キャプチャして表示</button>
+
+  <h2>結果</h2>
+  <div id="result"></div>
+
+  <script>
+    function capture() {
+      const target = document.getElementById("capture-area");
+
+      html2canvas(target).then(canvas => {
+        // 画像として表示
+        document.getElementById("result").innerHTML = "";
+        document.getElementById("result").appendChild(canvas);
+
+        // 画像としてダウンロードしたい場合
+        // const link = document.createElement("a");
+        // link.href = canvas.toDataURL("image/png");
+        // link.download = "capture.png";
+        // link.click();
+      });
+    }
+  </script>
+
+</body>
+</html>
