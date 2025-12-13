@@ -24,7 +24,7 @@
 </head>
 <body>
 
-  <h1>html2canvas デモ</h1>
+  <h1>html2canvas ver:1</h1>
 
   <div id="capture-area">
     <h2>キャプチャ対象</h2>
@@ -46,10 +46,10 @@
         document.getElementById("result").appendChild(canvas);
 
         // 画像としてダウンロードしたい場合
-        // const link = document.createElement("a");
-        // link.href = canvas.toDataURL("image/png");
-        // link.download = "capture.png";
-        // link.click();
+        const link = document.createElement("a");
+        link.href = canvas.toDataURL("image/png");
+        link.download = "capture.png";
+        link.click();
       });
     }
   </script>
