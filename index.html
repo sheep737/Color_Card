@@ -81,7 +81,7 @@
 </head>
 
 <body>
-<div>ver:3</div>
+<div>ver:4</div>
 <div class="controls">
     <div class="control">
         <h3>Card 1</h3>
@@ -119,22 +119,63 @@
 </div>
 
 <script>
+
+const COLOR_NAMES = [
+  { name: "White", rgb: [255,255,255] },
+  { name: "Ivory", rgb: [255,255,240] },
+  { name: "Snow", rgb: [255,250,250] },
+
+  { name: "Black", rgb: [0,0,0] },
+  { name: "Charcoal", rgb: [54,69,79] },
+
+  { name: "Light Gray", rgb: [211,211,211] },
+  { name: "Silver", rgb: [192,192,192] },
+
+  { name: "Mint Green", rgb: [189,252,201] },
+  { name: "Seafoam Green", rgb: [159,226,191] },
+  { name: "Aqua Green", rgb: [127,255,212] },
+
+  { name: "Sky Blue", rgb: [135,206,235] },
+  { name: "Baby Blue", rgb: [137,207,240] },
+  { name: "Light Blue", rgb: [173,216,230] },
+  { name: "Powder Blue", rgb: [176,224,230] },
+
+  { name: "Lavender", rgb: [230,230,250] },
+  { name: "Lilac", rgb: [200,162,200] },
+
+  { name: "Soft Pink", rgb: [255,192,203] },
+  { name: "Rose Pink", rgb: [255,182,193] },
+  { name: "Hot Pink", rgb: [255,105,180] },
+
+  { name: "Peach", rgb: [255,218,185] },
+  { name: "Coral", rgb: [255,127,80] },
+
+  { name: "Beige", rgb: [245,245,220] },
+  { name: "Sand", rgb: [244,164,96] }
+];
+    
 function applyCard(i) {
-    const label = document.getElementById("label" + i).value;
-    const color = document.getElementById("color" + i).value;
+    const colorInput = document.getElementById("color" + i);
+    const labelInput = document.getElementById("label" + i);
+
+    const color = colorInput.value;
     const card = document.getElementById("card" + i);
     const labelDiv = card.querySelector(".label");
     const spans = labelDiv.querySelectorAll("span");
 
+    // ★ 色名を自動生成
+    const autoName = getClosestColorName(color);
+    if (autoName) {
+        labelInput.value = autoName.toUpperCase();
+    }
+
     card.style.background = color;
-    spans[0].textContent = label;
+    spans[0].textContent = labelInput.value;
     spans[1].textContent = color.toUpperCase();
 
     // 明るさで文字色切り替え
     if (/^#([0-9A-F]{6})$/i.test(color)) {
-        const r = parseInt(color.substr(1,2),16);
-        const g = parseInt(color.substr(3,2),16);
-        const b = parseInt(color.substr(5,2),16);
+        const [r,g,b] = hexToRgb(color);
         const brightness = (r * 299 + g * 587 + b * 114) / 1000;
         labelDiv.style.color = brightness > 180 ? "#555" : "#fff";
     }
@@ -166,6 +207,38 @@ function downloadImage() {
         });
     });
 }
+
+function hexToRgb(hex) {
+  hex = hex.replace("#", "");
+  return [
+    parseInt(hex.substring(0,2),16),
+    parseInt(hex.substring(2,4),16),
+    parseInt(hex.substring(4,6),16)
+  ];
+}
+
+function getClosestColorName(hex) {
+  if (!/^#([0-9A-F]{6})$/i.test(hex)) return "";
+
+  const [r,g,b] = hexToRgb(hex);
+  let closest = null;
+  let minDistance = Infinity;
+
+  COLOR_NAMES.forEach(c => {
+    const dr = r - c.rgb[0];
+    const dg = g - c.rgb[1];
+    const db = b - c.rgb[2];
+    const distance = dr*dr + dg*dg + db*db;
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      closest = c.name;
+    }
+  });
+
+  return closest;
+}
+    
 </script>
 
 </body>
