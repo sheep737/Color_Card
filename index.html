@@ -81,7 +81,7 @@
 </head>
 
 <body>
-<div>ver:6 </div>
+<div>ver:7 </div>
 <div class="controls">
     <div class="control">
         <h3>Card 1</h3>
@@ -208,10 +208,12 @@ function applyCard(i) {
     const labelDiv = card.querySelector(".label");
     const spans = labelDiv.querySelectorAll("span");
 
-    // ★ 色名を自動生成
-    const autoName = getClosestColorName(color);
-    if (autoName) {
-        labelInput.value = autoName.toUpperCase();
+    // ★ 色名が未編集の場合のみ自動生成
+    if (!labelInput.dataset.manual) {
+        const autoName = getClosestColorName(color);
+        if (autoName) {
+            labelInput.value = autoName.toUpperCase();
+        }
     }
 
     card.style.background = color;
@@ -283,7 +285,14 @@ function getClosestColorName(hex) {
 
   return closest;
 }
-    
+
+for (let i = 1; i <= 4; i++) {
+    const labelInput = document.getElementById("label" + i);
+    labelInput.addEventListener("input", () => {
+        labelInput.dataset.manual = "true";
+    });
+}
+
 </script>
 
 </body>
