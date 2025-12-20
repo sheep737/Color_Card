@@ -81,7 +81,7 @@
 </head>
 
 <body>
-<div>ver:7 </div>
+<div>ver:8 </div>
 <div class="controls">
     <div class="control">
         <h3>Card 1</h3>
@@ -198,7 +198,9 @@ const COLOR_NAMES = [
   { name: "Camel", rgb: [193,154,107] },
   { name: "Chocolate", rgb: [123,63,0] }
 ];
-    
+
+const lastColors = {};
+
 function applyCard(i) {
     const colorInput = document.getElementById("color" + i);
     const labelInput = document.getElementById("label" + i);
@@ -208,12 +210,14 @@ function applyCard(i) {
     const labelDiv = card.querySelector(".label");
     const spans = labelDiv.querySelectorAll("span");
 
-    // ★ 色名が未編集の場合のみ自動生成
-    if (!labelInput.dataset.manual) {
+    const lastColors = {};
+
+    if (colorChanged) {
         const autoName = getClosestColorName(color);
         if (autoName) {
             labelInput.value = autoName.toUpperCase();
         }
+        lastColors[i] = color;
     }
 
     card.style.background = color;
