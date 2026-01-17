@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master - ver 3.0.0</title>
+    <title>Pull Golf Master - ver 3.1.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
-        canvas { display: block; background: linear-gradient(#1e3c72, #2a5298); touch-action: none; }
+        canvas { display: block; background: linear-gradient(#0f2027, #203a43, #2c5364); touch-action: none; }
         .ui { position: absolute; top: 40px; width: 100%; text-align: center; color: white; pointer-events: none; }
-        .btn { position: absolute; bottom: 30px; left: 20px; padding: 12px 24px; background: white; border: none; border-radius: 25px; font-weight: bold; pointer-events: auto; }
+        .btn { position: absolute; bottom: 30px; left: 20px; padding: 12px 24px; background: white; border: none; border-radius: 25px; font-weight: bold; pointer-events: auto; box-shadow: 0 4px #666; }
     </style>
 </head>
 <body>
@@ -28,39 +28,19 @@
         let touch = { start: null, curr: null };
 
         const stages = [
+            { name: "Stage 1", hint: "壁を越えよう", holeX: 0.85, holeW: 80, groundY: 0.8, obstacles: [{ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 }] },
+            { name: "Stage 2", hint: "バーを避けて！", holeX: 0.75, holeW: 90, groundY: 0.8, obstacles: [{ type: 'rotator', x: 0.75, y: 0.45, length: 100, angle: 0, speed: 0.07 }, { type: 'spike', x: 0.25, y: 0.78, w: 100 }] },
+            { name: "Stage 3", hint: "天井を使おう", holeX: 0.9, holeW: 70, groundY: 0.8, obstacles: [{ type: 'block', x: 0.6, y: 0.2, w: 200, h: 40 }, { type: 'block', x: 0.7, y: 0.65, w: 25, h: 100 }, { type: 'spike', x: 0.55, y: 0.78, w: 60 }] },
+            { name: "Stage 4", hint: "二つの回転", holeX: 0.8, holeW: 80, groundY: 0.8, obstacles: [{ type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 }, { type: 'rotator', x: 0.8, y: 0.4, length: 90, angle: Math.PI, speed: -0.08 }, { type: 'spike', x: 0.6, y: 0.78, w: 50 }] },
             { 
-                name: "Stage 1: 基本の放物線",
-                hint: "高い壁を飛び越えよう",
-                holeX: 0.85, holeW: 80, groundY: 0.8,
-                obstacles: [{ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 }]
-            },
-            { 
-                name: "Stage 2: タイミングの試練",
-                hint: "回転バーを避けて落とせ",
-                holeX: 0.75, holeW: 90, groundY: 0.8,
+                name: "Stage 5: グラビティ・ピット",
+                hint: "上の動く足場に当てて運ぼう",
+                holeX: 0.9, holeW: 60, groundY: 0.8,
                 obstacles: [
-                    { type: 'rotator', x: 0.75, y: 0.45, length: 100, angle: 0, speed: 0.07 },
-                    { type: 'spike', x: 0.25, y: 0.78, w: 100 }
-                ]
-            },
-            { 
-                name: "Stage 3: テクニカルショット",
-                hint: "トゲを越え、天井を使って穴へ",
-                holeX: 0.9, holeW: 70, groundY: 0.8,
-                obstacles: [
-                    { type: 'block', x: 0.6, y: 0.2, w: 200, h: 40 },
-                    { type: 'block', x: 0.7, y: 0.65, w: 25, h: 100 },
-                    { type: 'spike', x: 0.55, y: 0.78, w: 60 }
-                ]
-            },
-            {
-                name: "Stage 4: ダブル・スイング",
-                hint: "二つのバーの隙間を狙え",
-                holeX: 0.8, holeW: 80, groundY: 0.8,
-                obstacles: [
-                    { type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 },
-                    { type: 'rotator', x: 0.8, y: 0.4, length: 90, angle: Math.PI, speed: -0.08 },
-                    { type: 'spike', x: 0.6, y: 0.78, w: 50 }
+                    { type: 'block', x: 0.4, y: 0.4, w: 20, h: 350 }, // 巨大な左壁
+                    { type: 'block', x: 0.7, y: 0.4, w: 20, h: 350 }, // 巨大な右壁（穴の直前）
+                    { type: 'rotator', x: 0.55, y: 0.2, length: 120, angle: 0, speed: 0.04 }, // 空中の輸送バー
+                    { type: 'spike', x: 0.42, y: 0.78, w: 220 } // 壁に挟まれた死の谷
                 ]
             }
         ];
@@ -86,12 +66,10 @@
         function update() {
             const s = stages[currentStage];
             s.obstacles.forEach(ob => { if (ob.type === 'rotator') ob.angle += ob.speed; });
-
             if (!ball.moving) return;
             ball.vy += gravity; ball.x += ball.vx; ball.y += ball.vy;
 
-            const gY = s.groundY * height;
-            const hL = s.holeX * width - s.holeW / 2, hR = s.holeX * width + s.holeW / 2;
+            const gY = s.groundY * height, hL = s.holeX * width - s.holeW / 2, hR = s.holeX * width + s.holeW / 2;
 
             s.obstacles.forEach(ob => {
                 if (ob.type === 'rotator') {
@@ -106,12 +84,12 @@
                 if (ob.type === 'block') {
                     const bx = ob.x*width, by = ob.y*height, bw = ob.w, bh = ob.h;
                     if (ball.x+ball.r > bx && ball.x-ball.r < bx+bw && ball.y+ball.r > by && ball.y-ball.r < by+bh) {
-                        const overlapL = (ball.x + ball.r) - bx, overlapR = (bx + bw) - (ball.x - ball.r), overlapT = (ball.y + ball.r) - by, overlapB = (by + bh) - (ball.y - ball.r);
-                        const min = Math.min(overlapL, overlapR, overlapT, overlapB);
-                        if (min === overlapL) { ball.x = bx - ball.r; ball.vx *= -0.8; }
-                        else if (min === overlapR) { ball.x = bx + bw + ball.r; ball.vx *= -0.8; }
-                        else if (min === overlapT) { ball.y = by - ball.r; ball.vy *= -0.5; ball.vx *= 0.9; }
-                        else { ball.y = by + bh + ball.r; ball.vy *= -0.5; }
+                        const ovL = (ball.x + ball.r) - bx, ovR = (bx + bw) - (ball.x - ball.r), ovT = (ball.y + ball.r) - by, ovB = (by + bh) - (ball.y - ball.r);
+                        const min = Math.min(ovL, ovR, ovT, ovB);
+                        if (min === ovL) { ball.x = bx - ball.r; ball.vx *= -0.7; }
+                        else if (min === ovR) { ball.x = bx + bw + ball.r; ball.vx *= -0.7; }
+                        else if (min === ovT) { ball.y = by - ball.r; ball.vy *= -0.4; ball.vx *= 0.8; }
+                        else { ball.y = by + bh + ball.r; ball.vy *= -0.4; }
                     }
                 }
                 if (ob.type === 'spike') { if (ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5 && !ball.inHole) resetStage(); }
@@ -126,7 +104,7 @@
                 if (ball.x + ball.r > hR) { ball.x = hR - ball.r; ball.vx *= -0.5; }
             }
 
-            if (ball.y > height + 50) { if (ball.inHole) { alert("クリア！"); currentStage = (currentStage + 1) % stages.length; } resetStage(); }
+            if (ball.y > height + 50) { if (ball.inHole) { alert("CONGRATULATIONS! ALL CLEAR!"); currentStage = (currentStage + 1) % stages.length; } resetStage(); }
             if (ball.x < -20 || ball.x > width + 20) resetStage();
             if (Math.hypot(ball.vx, ball.vy) < 0.2 && !ball.inHole) ball.moving = false;
         }
@@ -154,7 +132,6 @@
                 }
             });
 
-            // 【共通デザイン】予測線
             if (touch.start) {
                 let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.curr.x)*0.14, vy: (touch.start.y - touch.curr.y)*0.14 };
                 ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.setLineDash([5,5]); ctx.moveTo(pv.x, pv.y);
@@ -162,10 +139,8 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // 【共通デザイン】ボール
             ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
-            ctx.fillStyle = "#fff"; ctx.fill();
-            ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
 
             update();
             requestAnimationFrame(draw);
