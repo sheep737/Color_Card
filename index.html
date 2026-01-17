@@ -2,132 +2,127 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>横視点プル・ゴルフ</title>
+    <title>横視点ゴルフ - ステージ制</title>
     <style>
         body { text-align: center; background-color: #87CEEB; color: #333; font-family: sans-serif; margin: 0; overflow: hidden; }
         canvas { background-color: #a2d2ff; border-bottom: 50px solid #2ecc71; cursor: crosshair; touch-action: none; }
         .ui { position: absolute; top: 10px; width: 100%; pointer-events: none; }
+        .stats { font-weight: bold; font-size: 20px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="ui">
         <h1>横視点ゴルフ</h1>
-        <p>画面をドラッグして放すと、ボールが飛びます！</p>
+        <div class="stats">ステージ: <span id="stageNum">1</span></div>
+        <p>ドラッグして放して飛ばそう！</p>
     </div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        let ball = { x: 100, y: 0, radius: 15, vx: 0, vy: 0 };
-        let hole = { x: canvas.width - 150, y: 0, radius: 30 };
+        const gravity = 0.5;
+        const friction = 0.98;
+        const bounce = -0.6;
+        const groundY = canvas.height - 50;
+
+        let currentStage = 0;
         let isDragging = false;
         let startPos = { x: 0, y: 0 };
         let currentPos = { x: 0, y: 0 };
+        let ball = { x: 100, y: 0, radius: 15, vx: 0, vy: 0 };
 
-        const gravity = 0.5;   // 重力
-        const friction = 0.98; // 空気抵抗・摩擦
-        const bounce = -0.6;   // 跳ね返り係数
-        const groundY = canvas.height - 50; // 地面の高さ
+        // ステージデータ (穴の位置と壁の配置)
+        const stages = [
+            { holeX: canvas.width - 150, walls: [] }, // ステージ1: 障害物なし
+            { holeX: canvas.width - 100, walls: [{ x: canvas.width/2, y: groundY - 150, w: 30, h: 150 }] }, // ステージ2: 真ん中に壁
+            { holeX: canvas.width - 80,  walls: [ // ステージ3: 高い壁と空中足場
+                { x: 400, y: groundY - 250, w: 40, h: 250 },
+                { x: 700, y: groundY - 100, w: 200, h: 20 }
+            ]}
+        ];
 
-        ball.y = groundY - ball.radius;
-        hole.y = groundY;
-
-        // イベントリスナー（マウス・タッチ両対応）
-        canvas.addEventListener('mousedown', start);
-        canvas.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', end);
-        canvas.addEventListener('touchstart', (e) => start(e.touches[0]));
-        canvas.addEventListener('touchmove', (e) => move(e.touches[0]));
-        window.addEventListener('touchend', end);
-
-        function start(e) {
-            const rect = canvas.getBoundingClientRect();
-            startPos.x = e.clientX - rect.left;
-            startPos.y = e.clientY - rect.top;
-            isDragging = true;
+        function initStage() {
+            const s = stages[currentStage];
+            ball.x = 100;
+            ball.y = groundY - ball.radius;
+            ball.vx = 0;
+            ball.vy = 0;
+            document.getElementById('stageNum').innerText = currentStage + 1;
         }
 
-        function move(e) {
-            if (!isDragging) return;
-            const rect = canvas.getBoundingClientRect();
-            currentPos.x = e.clientX - rect.left;
-            currentPos.y = e.clientY - rect.top;
-        }
-
-        function end() {
-            if (!isDragging) return;
-            // 引っ張ったベクトルの逆方向に力を加える
-            ball.vx = (startPos.x - currentPos.x) * 0.15;
-            ball.vy = (startPos.y - currentPos.y) * 0.15;
-            isDragging = false;
-        }
+        canvas.addEventListener('mousedown', (e) => { startPos = {x: e.clientX, y: e.clientY}; isDragging = true; });
+        canvas.addEventListener('mousemove', (e) => { currentPos = {x: e.clientX, y: e.clientY}; });
+        window.addEventListener('mouseup', () => {
+            if (isDragging) {
+                ball.vx = (startPos.x - currentPos.x) * 0.15;
+                ball.vy = (startPos.y - currentPos.y) * 0.15;
+                isDragging = false;
+            }
+        });
 
         function update() {
             if (!isDragging) {
-                // 重力と移動
                 ball.vy += gravity;
                 ball.x += ball.vx;
                 ball.y += ball.vy;
 
-                // 地面の衝突
+                // 地面衝突
                 if (ball.y + ball.radius > groundY) {
                     ball.y = groundY - ball.radius;
                     ball.vy *= bounce;
-                    ball.vx *= friction; // 地面との摩擦
+                    ball.vx *= friction;
                 }
 
-                // 壁の衝突
-                if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
-                    ball.vx *= bounce;
-                    ball.x = ball.x < ball.radius ? ball.radius : canvas.width - ball.radius;
-                }
+                // 壁との衝突判定
+                stages[currentStage].walls.forEach(w => {
+                    if (ball.x + ball.radius > w.x && ball.x - ball.radius < w.x + w.w &&
+                        ball.y + ball.radius > w.y && ball.y - ball.radius < w.y + w.h) {
+                        // 簡易的な跳ね返り（横から当たった場合を想定）
+                        ball.vx *= -0.8;
+                        ball.x += ball.vx; // 埋まり防止
+                    }
+                });
+
+                // 画面端
+                if (ball.x < 0 || ball.x > canvas.width) ball.vx *= -1;
             }
 
-            // クリア判定（穴に入ったか）
-            const distToHole = Math.hypot(ball.x - hole.x, ball.y - hole.y);
-            if (distToHole < hole.radius && Math.abs(ball.vy) < 5) {
-                alert("ナイスイン！");
-                reset();
+            // クリア判定
+            const holeX = stages[currentStage].holeX;
+            const dist = Math.hypot(ball.x - holeX, ball.y - groundY);
+            if (dist < 30 && Math.abs(ball.vx) < 2) {
+                alert("ステージクリア！");
+                currentStage = (currentStage + 1) % stages.length;
+                initStage();
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 穴
+            // 穴の描画
+            const holeX = stages[currentStage].holeX;
             ctx.fillStyle = "black";
             ctx.beginPath();
-            ctx.arc(hole.x, hole.y, hole.radius, Math.PI, 0); // 半円
+            ctx.arc(holeX, groundY, 25, Math.PI, 0);
             ctx.fill();
 
-            // 旗
-            ctx.strokeStyle = "black";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(hole.x, hole.y);
-            ctx.lineTo(hole.x, hole.y - 80);
-            ctx.stroke();
-            ctx.fillStyle = "red";
-            ctx.beginPath();
-            ctx.moveTo(hole.x, hole.y - 80);
-            ctx.lineTo(hole.x + 30, hole.y - 65);
-            ctx.lineTo(hole.x, hole.y - 50);
-            ctx.fill();
+            // 壁の描画
+            ctx.fillStyle = "#7f8c8d";
+            stages[currentStage].walls.forEach(w => {
+                ctx.fillRect(w.x, w.y, w.w, w.h);
+            });
 
-            // 軌道予測ライン（ドラッグ中のみ表示）
+            // 引っ張りガイド
             if (isDragging) {
                 ctx.beginPath();
                 ctx.moveTo(ball.x, ball.y);
-                // 引っ張った強さを可視化
-                const targetX = ball.x + (startPos.x - currentPos.x);
-                const targetY = ball.y + (startPos.y - currentPos.y);
-                ctx.lineTo(targetX, targetY);
-                ctx.strokeStyle = "white";
+                ctx.lineTo(ball.x + (startPos.x - currentPos.x), ball.y + (startPos.y - currentPos.y));
+                ctx.strokeStyle = "rgba(255,255,255,0.7)";
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
                 ctx.setLineDash([]);
@@ -138,21 +133,13 @@
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fillStyle = "white";
             ctx.fill();
-            ctx.strokeStyle = "#333";
-            ctx.lineWidth = 1;
             ctx.stroke();
 
             update();
             requestAnimationFrame(draw);
         }
 
-        function reset() {
-            ball.x = 100;
-            ball.y = groundY - ball.radius;
-            ball.vx = 0;
-            ball.vy = 0;
-        }
-
+        initStage();
         draw();
     </script>
 </body>
