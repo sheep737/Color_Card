@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master - ver 2.9.0</title>
+    <title>Pull Golf Master - ver 3.0.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
@@ -48,9 +48,19 @@
                 hint: "トゲを越え、天井を使って穴へ",
                 holeX: 0.9, holeW: 70, groundY: 0.8,
                 obstacles: [
-                    { type: 'block', x: 0.6, y: 0.2, w: 200, h: 40 }, // 天井反射板
-                    { type: 'block', x: 0.7, y: 0.65, w: 25, h: 100 }, // 穴の手前の壁
-                    { type: 'spike', x: 0.55, y: 0.78, w: 60 } // 穴のかなり手前のトゲ
+                    { type: 'block', x: 0.6, y: 0.2, w: 200, h: 40 },
+                    { type: 'block', x: 0.7, y: 0.65, w: 25, h: 100 },
+                    { type: 'spike', x: 0.55, y: 0.78, w: 60 }
+                ]
+            },
+            {
+                name: "Stage 4: ダブル・スイング",
+                hint: "二つのバーの隙間を狙え",
+                holeX: 0.8, holeW: 80, groundY: 0.8,
+                obstacles: [
+                    { type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 },
+                    { type: 'rotator', x: 0.8, y: 0.4, length: 90, angle: Math.PI, speed: -0.08 },
+                    { type: 'spike', x: 0.6, y: 0.78, w: 50 }
                 ]
             }
         ];
@@ -89,7 +99,9 @@
                     const dx = x2 - ob.x*width, dy = y2 - ob.y*height, l2 = dx*dx + dy*dy;
                     let t = Math.max(0, Math.min(1, ((ball.x - ob.x*width) * dx + (ball.y - ob.y*height) * dy) / l2));
                     const closestX = ob.x*width + t * dx, closestY = ob.y*height + t * dy;
-                    if (Math.hypot(ball.x - closestX, ball.y - closestY) < ball.r) { ball.vx *= -1.2; ball.vy *= -1.2; ball.x += ball.vx; ball.y += ball.vy; }
+                    if (Math.hypot(ball.x - closestX, ball.y - closestY) < ball.r) { 
+                        ball.vx *= -1.2; ball.vy *= -1.2; ball.x += ball.vx; ball.y += ball.vy; 
+                    }
                 }
                 if (ob.type === 'block') {
                     const bx = ob.x*width, by = ob.y*height, bw = ob.w, bh = ob.h;
@@ -124,12 +136,9 @@
             const s = stages[currentStage];
             const gY = s.groundY * height, hL = s.holeX * width - s.holeW / 2, hW = s.holeW;
 
-            // 穴
             ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(hL, gY, hW, height - gY);
-            // 地面
             ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, gY, hL, height - gY); ctx.fillRect(hL + hW, gY, width, height - gY);
 
-            // 障害物
             s.obstacles.forEach(ob => {
                 if (ob.type === 'rotator') {
                     ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 10; ctx.lineCap = "round";
@@ -145,7 +154,7 @@
                 }
             });
 
-            // 予測線
+            // 【共通デザイン】予測線
             if (touch.start) {
                 let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.curr.x)*0.14, vy: (touch.start.y - touch.curr.y)*0.14 };
                 ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.setLineDash([5,5]); ctx.moveTo(pv.x, pv.y);
@@ -153,7 +162,7 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // ボール（デザイン固定）
+            // 【共通デザイン】ボール
             ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
             ctx.fillStyle = "#fff"; ctx.fill();
             ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
