@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master - ver 3.1.1</title>
+    <title>Pull Golf Master 20 - ver 4.0.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
-        canvas { display: block; background: linear-gradient(#0f2027, #203a43, #2c5364); touch-action: none; }
+        canvas { display: block; background: linear-gradient(#0f2027, #2c5364); touch-action: none; }
         .ui { position: absolute; top: 40px; width: 100%; text-align: center; color: white; pointer-events: none; }
+        .st-num { font-size: 0.8em; opacity: 0.7; }
         .btn { position: absolute; bottom: 30px; left: 20px; padding: 12px 24px; background: white; border: none; border-radius: 25px; font-weight: bold; pointer-events: auto; }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div class="ui"><h2 id="stName"></h2><p id="stHint"></p></div>
+    <div class="ui"><div class="st-num" id="stNum"></div><h2 id="stName"></h2><p id="stHint"></p></div>
     <button class="btn" onclick="resetStage()">リトライ</button>
 
     <script>
@@ -27,23 +28,26 @@
         let ball = { x: 0, y: 0, r: 13, vx: 0, vy: 0, moving: false, inHole: false };
         let touch = { start: null, curr: null };
 
-        const stages = [
-            { name: "Stage 1", hint: "壁を越えよう", holeX: 0.85, holeW: 80, groundY: 0.8, obstacles: [{ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 }] },
-            { name: "Stage 2", hint: "バーを避けて！", holeX: 0.75, holeW: 90, groundY: 0.8, obstacles: [{ type: 'rotator', x: 0.75, y: 0.45, length: 100, angle: 0, speed: 0.07 }, { type: 'spike', x: 0.25, y: 0.78, w: 100 }] },
-            { name: "Stage 3", hint: "天井を使おう", holeX: 0.9, holeW: 70, groundY: 0.8, obstacles: [{ type: 'block', x: 0.6, y: 0.2, w: 200, h: 40 }, { type: 'block', x: 0.7, y: 0.65, w: 25, h: 100 }, { type: 'spike', x: 0.55, y: 0.78, w: 60 }] },
-            { name: "Stage 4", hint: "二つの回転", holeX: 0.8, holeW: 80, groundY: 0.8, obstacles: [{ type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 }, { type: 'rotator', x: 0.8, y: 0.4, length: 90, angle: Math.PI, speed: -0.08 }, { type: 'spike', x: 0.6, y: 0.78, w: 50 }] },
-            { 
-                name: "Stage 5: グラビティ・ピット",
-                hint: "トゲを避けて壁の向こうへ！",
-                holeX: 0.9, holeW: 60, groundY: 0.8,
-                obstacles: [
-                    { type: 'block', x: 0.4, y: 0.45, w: 20, h: 300 },
-                    { type: 'block', x: 0.75, y: 0.55, w: 20, h: 200 }, // 右壁を少し低く調整
-                    { type: 'rotator', x: 0.58, y: 0.25, length: 110, angle: 0, speed: 0.045 },
-                    { type: 'spike', x: 0.42, y: 0.78, w: 140 } // 穴(0.9)に被らないよう幅を140に制限
-                ]
+        // 全20ステージのデータ
+        const stages = [];
+        for(let i=1; i<=20; i++) {
+            let s = { name: `Stage ${i}`, hint: "穴へ落とそう！", holeX: 0.7 + (Math.random()*0.2), holeW: 80 - (i*2), groundY: 0.8, obstacles: [] };
+            
+            // ステージごとの特徴付け
+            if(i === 1) s.obstacles.push({ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 });
+            else if(i === 2) s.obstacles.push({ type: 'rotator', x: 0.7, y: 0.4, length: 100, angle: 0, speed: 0.07 }, { type: 'spike', x: 0.2, y: 0.78, w: 100 });
+            else if(i === 3) s.obstacles.push({ type: 'block', x: 0.5, y: 0.2, w: 200, h: 30 }, { type: 'block', x: 0.7, y: 0.6, w: 20, h: 120 });
+            else if(i === 4) s.obstacles.push({ type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 }, { type: 'rotator', x: 0.7, y: 0.4, length: 80, angle: 1, speed: -0.06 });
+            else if(i === 5) s.obstacles.push({ type: 'block', x: 0.4, y: 0.4, w: 20, h: 300 }, { type: 'block', x: 0.7, y: 0.5, w: 20, h: 250 }, { type: 'spike', x: 0.42, y: 0.78, w: 150 });
+            else {
+                // 6〜20はランダム要素を混ぜつつ難易度上昇
+                if(i % 3 === 0) s.obstacles.push({ type: 'rotator', x: 0.5, y: 0.3, length: 150, angle: 0, speed: 0.05 + (i*0.005) });
+                if(i % 2 === 0) s.obstacles.push({ type: 'block', x: 0.3 + (i*0.02), y: 0.4, w: 30, h: 200 });
+                s.obstacles.push({ type: 'spike', x: 0.3, y: 0.78, w: 50 + (i*5) });
+                s.holeW = Math.max(40, 80 - (i*2)); // 穴がどんどん狭くなる
             }
-        ];
+            stages.push(s);
+        }
 
         function resize() {
             width = window.innerWidth; height = window.innerHeight;
@@ -55,6 +59,7 @@
             const s = stages[currentStage];
             ball.x = 80; ball.y = (s.groundY * height) - ball.r;
             ball.vx = 0; ball.vy = 0; ball.moving = false; ball.inHole = false;
+            document.getElementById('stNum').innerText = `${currentStage + 1} / ${stages.length}`;
             document.getElementById('stName').innerText = s.name;
             document.getElementById('stHint').innerText = s.hint;
         }
@@ -76,10 +81,8 @@
                     const x2 = ob.x * width + Math.cos(ob.angle) * ob.length, y2 = ob.y * height + Math.sin(ob.angle) * ob.length;
                     const dx = x2 - ob.x*width, dy = y2 - ob.y*height, l2 = dx*dx + dy*dy;
                     let t = Math.max(0, Math.min(1, ((ball.x - ob.x*width) * dx + (ball.y - ob.y*height) * dy) / l2));
-                    const closestX = ob.x*width + t * dx, closestY = ob.y*height + t * dy;
-                    if (Math.hypot(ball.x - closestX, ball.y - closestY) < ball.r) { 
-                        ball.vx *= -1.2; ball.vy *= -1.2; ball.x += ball.vx; ball.y += ball.vy; 
-                    }
+                    const cX = ob.x*width + t * dx, cY = ob.y*height + t * dy;
+                    if (Math.hypot(ball.x - cX, ball.y - cY) < ball.r) { ball.vx *= -1.2; ball.vy *= -1.2; ball.x += ball.vx; ball.y += ball.vy; }
                 }
                 if (ob.type === 'block') {
                     const bx = ob.x*width, by = ob.y*height, bw = ob.w, bh = ob.h;
@@ -92,10 +95,7 @@
                         else { ball.y = by + bh + ball.r; ball.vy *= -0.4; }
                     }
                 }
-                if (ob.type === 'spike') { 
-                    // トゲの判定を厳密に。穴のinHoleフラグが立っている間は無視
-                    if (!ball.inHole && ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5) resetStage(); 
-                }
+                if (ob.type === 'spike') { if (!ball.inHole && ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5) resetStage(); }
             });
 
             if (ball.y + ball.r > gY) {
@@ -107,7 +107,17 @@
                 if (ball.x + ball.r > hR) { ball.x = hR - ball.r; ball.vx *= -0.5; }
             }
 
-            if (ball.y > height + 50) { if (ball.inHole) { alert("全ステージクリア！おめでとうございます！"); currentStage = 0; } resetStage(); }
+            if (ball.y > height + 50) { 
+                if (ball.inHole) {
+                    if (currentStage < stages.length - 1) {
+                        currentStage++; // 次のステージへ
+                    } else {
+                        alert("祝！20ステージ完全制覇！");
+                        currentStage = 0;
+                    }
+                }
+                resetStage();
+            }
             if (ball.x < -20 || ball.x > width + 20) resetStage();
             if (Math.hypot(ball.vx, ball.vy) < 0.2 && !ball.inHole) ball.moving = false;
         }
@@ -116,10 +126,8 @@
             ctx.clearRect(0, 0, width, height);
             const s = stages[currentStage];
             const gY = s.groundY * height, hL = s.holeX * width - s.holeW / 2, hW = s.holeW;
-
             ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(hL, gY, hW, height - gY);
             ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, gY, hL, height - gY); ctx.fillRect(hL + hW, gY, width, height - gY);
-
             s.obstacles.forEach(ob => {
                 if (ob.type === 'rotator') {
                     ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 10; ctx.lineCap = "round";
@@ -129,24 +137,18 @@
                 if (ob.type === 'block') { ctx.fillStyle = "#95a5a6"; ctx.fillRect(ob.x*width, ob.y*height, ob.w, ob.h); }
                 if (ob.type === 'spike') {
                     ctx.fillStyle = "#e74c3c";
-                    for(let i=0; i<ob.w; i+=20) {
-                        ctx.beginPath(); ctx.moveTo(ob.x*width+i, gY); ctx.lineTo(ob.x*width+i+10, gY-15); ctx.lineTo(ob.x*width+i+20, gY); ctx.fill();
-                    }
+                    for(let i=0; i<ob.w; i+=20) { ctx.beginPath(); ctx.moveTo(ob.x*width+i, gY); ctx.lineTo(ob.x*width+i+10, gY-15); ctx.lineTo(ob.x*width+i+20, gY); ctx.fill(); }
                 }
             });
-
             if (touch.start) {
                 let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.curr.x)*0.14, vy: (touch.start.y - touch.curr.y)*0.14 };
                 ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.setLineDash([5,5]); ctx.moveTo(pv.x, pv.y);
                 for(let i=0; i<30; i++) { pv.vy += gravity; pv.x += pv.vx; pv.y += pv.vy; ctx.lineTo(pv.x, pv.y); }
                 ctx.stroke(); ctx.setLineDash([]);
             }
-
             ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
             ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
-
-            update();
-            requestAnimationFrame(draw);
+            update(); requestAnimationFrame(draw);
         }
 
         window.addEventListener('resize', resize);
