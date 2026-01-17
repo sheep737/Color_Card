@@ -3,189 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Mobile - ver 1.6.0</title>
+    <title>Pull Golf Vertical - ver 1.7.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-        body { 
-            margin: 0; padding: 0; overflow: hidden; position: fixed;
-            width: 100%; height: 100%; background: #000; font-family: -apple-system, sans-serif;
-        }
-        canvas { display: block; background: linear-gradient(to bottom, #1e3c72, #2a5298); touch-action: none; }
-        .ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
-        }
-        .header { padding-top: env(safe-area-inset-top); background: rgba(0,0,0,0.3); padding-bottom: 10px; }
-        .footer { padding-bottom: env(safe-area-inset-bottom); padding-top: 10px; }
-        h1 { margin: 5px 0; font-size: 20px; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        .btn {
-            pointer-events: auto; background: rgba(255,255,255,0.9); color: #333;
-            border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold;
-            margin: 10px; font-size: 14px; -webkit-appearance: none;
-        }
+        body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #87CEEB; font-family: sans-serif; }
+        canvas { display: block; background: linear-gradient(#1e3c72, #2a5298); touch-action: none; }
+        .ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; pointer-events: none; text-shadow: 1px 1px 4px rgba(0,0,0,0.8); }
+        .btn { position: absolute; bottom: 30px; right: 20px; padding: 15px 25px; background: white; border: none; border-radius: 30px; font-weight: bold; pointer-events: auto; }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div class="ui-layer">
-        <div class="header">
-            <h1 id="stageTitle">Stage 1</h1>
-            <div style="color: #fff; font-size: 12px;">引っ張って放すだけ！</div>
-        </div>
-        <div class="footer">
-            <button class="btn" onclick="resetStage()">やり直し</button>
-        </div>
+    <div class="ui">
+        <h2 id="stageName">Stage 1</h2>
+        <p>穴に落とせばクリア！</p>
     </div>
+    <button class="btn" onclick="resetStage()">リトライ</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const gravity = 0.4;
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        const gravity = 0.45;
-        let groundY = canvas.height - 80;
+        let width, height, groundY;
         let currentStage = 0;
-        let ball = { x: 80, y: 0, r: 14, vx: 0, vy: 0, moving: false };
+        let ball = { x: 0, y: 0, r: 12, vx: 0, vy: 0, moving: false };
         let touch = { start: null, current: null };
 
+        // ステージ設定：holeXが穴の中心座標（割合）
         const stages = [
-            { name: "First Hole", hole: {x: 0.8, y: 1.0}, walls: [] },
-            { name: "Over the Wall", hole: {x: 0.85, y: 1.0}, walls: [{x: 0.5, y: 0.7, w: 0.05, h: 0.3}] },
-            { name: "Floating Island", hole: {x: 0.8, y: 0.4}, walls: [{x: 0.7, y: 0.4, w: 0.3, h: 0.05}] }
+            { name: "大きな穴", holeX: 0.7, holeW: 80 },
+            { name: "狭い穴", holeX: 0.8, holeW: 40 },
+            { name: "遠くの穴", holeX: 0.9, holeW: 50 }
         ];
 
-        function getStageData() {
-            const s = stages[currentStage];
-            return {
-                name: s.name,
-                hole: { x: s.hole.x * canvas.width, y: (s.hole.y * groundY) },
-                walls: s.walls.map(w => ({
-                    x: w.x * canvas.width, y: w.y * groundY,
-                    w: w.w * canvas.width, h: w.h * groundY
-                }))
-            };
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            groundY = height - 100;
+            resetStage();
         }
 
-        function start(e) {
+        function resetStage() {
+            ball.x = 80;
+            ball.y = groundY - ball.r;
+            ball.vx = 0; ball.vy = 0; ball.moving = false;
+            document.getElementById('stageName').innerText = stages[currentStage].name;
+        }
+
+        // --- タッチイベント ---
+        canvas.addEventListener('touchstart', e => {
             if (ball.moving) return;
-            const t = e.touches ? e.touches[0] : e;
+            const t = e.touches[0];
             touch.start = { x: t.clientX, y: t.clientY };
             touch.current = { x: t.clientX, y: t.clientY };
-        }
+        }, {passive: false});
 
-        function move(e) {
-            if (!touch.start) return;
-            const t = e.touches ? e.touches[0] : e;
-            touch.current = { x: t.clientX, y: t.clientY };
-        }
+        canvas.addEventListener('touchmove', e => {
+            if (touch.start) {
+                const t = e.touches[0];
+                touch.current = { x: t.clientX, y: t.clientY };
+            }
+        }, {passive: false});
 
-        function end() {
-            if (!touch.start) return;
-            const dx = touch.start.x - touch.current.x;
-            const dy = touch.start.y - touch.current.y;
-            ball.vx = dx * 0.13;
-            ball.vy = dy * 0.13;
-            ball.moving = true;
+        window.addEventListener('touchend', () => {
+            if (touch.start && touch.current) {
+                ball.vx = (touch.start.x - touch.current.x) * 0.12;
+                ball.vy = (touch.start.y - touch.current.y) * 0.12;
+                ball.moving = true;
+            }
             touch.start = null;
-        }
-
-        canvas.addEventListener('touchstart', start, {passive: false});
-        canvas.addEventListener('touchmove', move, {passive: false});
-        window.addEventListener('touchend', end);
+        });
 
         function update() {
-            const data = getStageData();
             if (ball.moving) {
                 ball.vy += gravity;
                 ball.x += ball.vx;
                 ball.y += ball.vy;
 
-                // 穴への吸引力
-                const dist = Math.hypot(ball.x - data.hole.x, ball.y - data.hole.y);
-                if (dist < 40) {
-                    ball.vx += (data.hole.x - ball.x) * 0.08;
-                    ball.vy += (data.hole.y - ball.y) * 0.08;
-                }
+                const s = stages[currentStage];
+                const holeLeft = s.holeX * width - s.holeW / 2;
+                const holeRight = s.holeX * width + s.holeW / 2;
 
-                // 地面
+                // 地面との接触判定（穴以外の場所）
                 if (ball.y + ball.r > groundY) {
-                    ball.y = groundY - ball.r;
-                    ball.vy *= -0.3; ball.vx *= 0.92;
+                    // 穴の中にいない場合のみ跳ね返る
+                    if (ball.x < holeLeft || ball.x > holeRight) {
+                        ball.y = groundY - ball.r;
+                        ball.vy *= -0.3;
+                        ball.vx *= 0.95;
+                    }
                 }
 
-                // 壁
-                data.walls.forEach(w => {
-                    if (ball.x + ball.r > w.x && ball.x - ball.r < w.x + w.w && ball.y + ball.r > w.y && ball.y - ball.r < w.y + w.h) {
-                        if (ball.y < w.y + 10) { ball.y = w.y - ball.r; ball.vy *= -0.2; }
-                        else { ball.vx *= -0.5; }
-                    }
-                });
-
-                if (Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.2) {
-                    ball.moving = false;
-                    if (dist < 25) {
-                        alert("Great Shot!");
+                // 穴の底（ゴール判定）
+                if (ball.y > height) {
+                    if (ball.x > holeLeft && ball.x < holeRight) {
+                        alert("ナイスイン！");
                         currentStage = (currentStage + 1) % stages.length;
-                        resetStage();
                     }
+                    resetStage();
+                }
+
+                // 停止判定
+                if (Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.2 && ball.y >= groundY - ball.r) {
+                    ball.moving = false;
                 }
             }
-            if (ball.y > canvas.height || ball.x < 0 || ball.x > canvas.width) resetStage();
         }
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const data = getStageData();
-            document.getElementById('stageTitle').innerText = data.name;
+            ctx.clearRect(0, 0, width, height);
+            const s = stages[currentStage];
+            const hX = s.holeX * width;
+            const hW = s.holeW;
 
-            // 穴
-            ctx.fillStyle = "#111";
-            ctx.beginPath(); ctx.arc(data.hole.x, data.hole.y, 22, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.stroke();
+            // 地面の描画（穴を空けるために2つの矩形を描く）
+            ctx.fillStyle = "#2ecc71";
+            ctx.fillRect(0, groundY, hX - hW/2, 100); // 左の地面
+            ctx.fillRect(hX + hW/2, groundY, width, 100); // 右の地面
 
-            // 地面/壁
-            ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, groundY, canvas.width, 100);
-            ctx.fillStyle = "#fff"; data.walls.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
+            // 穴のガイド（視覚的にわかりやすく）
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.fillRect(hX - hW/2, groundY, hW, height - groundY);
 
-            // 軌道予測
+            // 予測線
             if (touch.start) {
-                let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.current.x)*0.13, vy: (touch.start.y - touch.current.y)*0.13 };
-                ctx.beginPath(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "#f1c40f";
+                let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.current.x)*0.12, vy: (touch.start.y - touch.current.y)*0.12 };
+                ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.strokeStyle = "yellow";
                 ctx.moveTo(pv.x, pv.y);
-                for(let i=0; i<25; i++) {
+                for(let i=0; i<30; i++) {
                     pv.vy += gravity; pv.x += pv.vx; pv.y += pv.vy;
                     ctx.lineTo(pv.x, pv.y);
                 }
                 ctx.stroke(); ctx.setLineDash([]);
-
-                // 引っ張りライン
-                ctx.beginPath();
-                ctx.moveTo(touch.start.x, touch.start.y);
-                ctx.lineTo(touch.current.x, touch.current.y);
-                ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
             }
 
             // ボール
-            ctx.fillStyle = "white";
-            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+            ctx.fillStyle = "white"; ctx.fill();
             ctx.strokeStyle = "#333"; ctx.stroke();
 
             update();
             requestAnimationFrame(draw);
         }
 
-        function resetStage() {
-            groundY = canvas.height - 80;
-            ball.x = 60; ball.y = groundY - 20; ball.vx = 0; ball.vy = 0; ball.moving = false;
-        }
-
-        resetStage();
+        window.addEventListener('resize', resize);
+        resize();
         draw();
     </script>
 </body>
