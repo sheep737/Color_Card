@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master 20 - ver 4.1.0</title>
+    <title>Pull Golf Master 20 - ver 5.0.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
-        canvas { display: block; background: linear-gradient(#0f2027, #2c5364); touch-action: none; }
+        canvas { display: block; background: linear-gradient(#1a1a2e, #16213e); touch-action: none; }
         .ui { position: absolute; top: 40px; width: 100%; text-align: center; color: white; pointer-events: none; }
         .st-num { font-size: 0.8em; opacity: 0.7; }
         .btn { position: absolute; bottom: 30px; left: 20px; padding: 12px 24px; background: white; border: none; border-radius: 25px; font-weight: bold; pointer-events: auto; }
@@ -23,35 +23,31 @@
         const ctx = canvas.getContext('2d');
         const gravity = 0.5;
 
-        let width, height;
-        let currentStage = 0;
-        let ball = { x: 0, y: 0, r: 13, vx: 0, vy: 0, moving: false, inHole: false };
+        let width, height, currentStage = 0;
+        let ball = { x: 0, y: 0, r: 12, vx: 0, vy: 0, moving: false, inHole: false };
         let touch = { start: null, curr: null };
+        let gameTime = 0;
 
         const stages = [];
-        function initStages() {
+        function createStages() {
             stages.length = 0;
             for(let i=1; i<=20; i++) {
-                let hX = 0.7 + (Math.random()*0.2); // 穴の位置
-                let hW = Math.max(45, 85 - (i * 2)); // 穴の幅
-                let s = { name: `Stage ${i}`, hint: "穴へ落とそう！", holeX: hX, holeW: hW, groundY: 0.8, obstacles: [] };
-                
-                // 穴の左端座標(比率)
-                let hL_ratio = hX - (hW/2)/width;
-
-                if(i === 1) s.obstacles.push({ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 });
-                else if(i === 2) s.obstacles.push({ type: 'rotator', x: 0.7, y: 0.4, length: 100, angle: 0, speed: 0.07 }, { type: 'spike', x: 0.2, y: 0.78, w: 100 });
-                else if(i === 3) s.obstacles.push({ type: 'block', x: 0.5, y: 0.2, w: 200, h: 30 }, { type: 'block', x: 0.7, y: 0.6, w: 20, h: 120 });
-                else {
-                    if(i % 3 === 0) s.obstacles.push({ type: 'rotator', x: 0.4, y: 0.3, length: 120, angle: 0, speed: 0.05 + (i*0.003) });
-                    if(i % 2 === 0) s.obstacles.push({ type: 'block', x: 0.4, y: 0.4, w: 25, h: 200 });
-                    
-                    // トゲの生成：穴の左端より必ず手前で終わるように計算
-                    let spikeStartX = 0.25;
-                    let maxSpikeW = (hX * width - hW/2 - 40) - (spikeStartX * width); 
-                    if(maxSpikeW > 20) {
-                        s.obstacles.push({ type: 'spike', x: spikeStartX, y: 0.78, w: Math.min(maxSpikeW, 50 + i*10) });
-                    }
+                let s = { name: `Level ${i}`, hint: "", holeX: 0.8, holeW: 70, groundY: 0.8, obs: [] };
+                // 難易度とギミックの割り振り
+                if(i===1) { s.hint="基本のジャンプ"; s.obs.push({t:'block', x:0.4, y:0.5, w:20, h:200}); }
+                else if(i===2) { s.hint="回転を読め"; s.obs.push({t:'rot', x:0.6, y:0.4, l:100, s:0.08}); }
+                else if(i===3) { s.hint="加速パッド登場"; s.obs.push({t:'accel', x:0.4, y:0.78, w:80, p:15}); s.obs.push({t:'block', x:0.6, y:0.3, w:20, h:300}); }
+                else if(i===4) { s.hint="ワープの試練"; s.obs.push({t:'warp', x:0.3, y:0.6, tx:0.7, ty:0.2}); s.obs.push({t:'spike', x:0.4, y:0.78, w:150}); }
+                else if(i===5) { s.hint="動く床に乗ろう"; s.obs.push({t:'move', x:0.3, y:0.6, w:100, h:20, r:150, s:3}); }
+                else if(i===6) { s.hint="低重力エリア"; s.obs.push({t:'lowG', x:0.4, y:0.2, w:150, h:300}); s.obs.push({t:'spike', x:0.4, y:0.78, w:150}); }
+                else if(i===7) { s.hint="伸縮する穴"; s.dynamicHole = true; s.obs.push({t:'rot', x:0.4, y:0.4, l:80, s:0.1}); }
+                else if(i<=20) {
+                    // 後半は複合ギミック
+                    s.obs.push({t:'move', x:0.2, y:0.5, w:80, h:20, r:100, s:i*0.2});
+                    if(i%2===0) s.obs.push({t:'warp', x:0.5, y:0.7, tx:0.8, ty:0.2});
+                    if(i%3===0) s.obs.push({t:'accel', x:0.3, y:0.78, w:60, p:12+i});
+                    s.obs.push({t:'spike', x:0.4, y:0.78, w:100});
+                    s.holeW = Math.max(35, 70 - i);
                 }
                 stages.push(s);
             }
@@ -60,103 +56,100 @@
         function resize() {
             width = window.innerWidth; height = window.innerHeight;
             canvas.width = width; canvas.height = height;
-            initStages(); // サイズ変更時に穴の位置計算を正確にするため再生成
-            resetStage();
+            createStages(); resetStage();
         }
 
         function resetStage() {
             const s = stages[currentStage];
-            ball.x = 80; ball.y = (s.groundY * height) - ball.r;
+            ball.x = 60; ball.y = (s.groundY * height) - ball.r;
             ball.vx = 0; ball.vy = 0; ball.moving = false; ball.inHole = false;
-            document.getElementById('stNum').innerText = `${currentStage + 1} / ${stages.length}`;
+            document.getElementById('stNum').innerText = `${currentStage+1}/20`;
             document.getElementById('stName').innerText = s.name;
+            document.getElementById('stHint').innerText = s.hint;
         }
 
-        canvas.addEventListener('touchstart', e => { if(!ball.moving) { touch.start = { x: e.touches[0].clientX, y: e.touches[0].clientY }; touch.curr = touch.start; } }, {passive: false});
-        canvas.addEventListener('touchmove', e => { if(touch.start) touch.curr = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }, {passive: false});
-        window.addEventListener('touchend', () => { if(touch.start) { ball.vx = (touch.start.x - touch.curr.x) * 0.14; ball.vy = (touch.start.y - touch.curr.y) * 0.14; ball.moving = true; } touch.start = null; });
+        canvas.addEventListener('touchstart', e => { if(!ball.moving) { touch.start = { x:e.touches[0].clientX, y:e.touches[0].clientY }; touch.curr = touch.start; } });
+        canvas.addEventListener('touchmove', e => { if(touch.start) touch.curr = { x:e.touches[0].clientX, y:e.touches[0].clientY }; });
+        window.addEventListener('touchend', () => { if(touch.start) { ball.vx = (touch.start.x - touch.curr.x)*0.13; ball.vy = (touch.start.y - touch.curr.y)*0.13; ball.moving = true; } touch.start = null; });
 
         function update() {
+            gameTime++;
             const s = stages[currentStage];
-            s.obstacles.forEach(ob => { if (ob.type === 'rotator') ob.angle += ob.speed; });
-            if (!ball.moving) return;
-            ball.vy += gravity; ball.x += ball.vx; ball.y += ball.vy;
+            let currentG = gravity;
 
-            const gY = s.groundY * height, hL = s.holeX * width - s.holeW / 2, hR = s.holeX * width + s.holeW / 2;
+            // 穴の伸縮
+            if(s.dynamicHole) s.holeW = 50 + Math.sin(gameTime*0.05) * 30;
 
-            s.obstacles.forEach(ob => {
-                if (ob.type === 'rotator') {
-                    const x2 = ob.x * width + Math.cos(ob.angle) * ob.length, y2 = ob.y * height + Math.sin(ob.angle) * ob.length;
-                    const dx = x2 - ob.x*width, dy = y2 - ob.y*height, l2 = dx*dx + dy*dy;
-                    let t = Math.max(0, Math.min(1, ((ball.x - ob.x*width) * dx + (ball.y - ob.y*height) * dy) / l2));
-                    const cX = ob.x*width + t * dx, cY = ob.y*height + t * dy;
-                    if (Math.hypot(ball.x - cX, ball.y - cY) < ball.r) { ball.vx *= -1.2; ball.vy *= -1.2; ball.x += ball.vx; ball.y += ball.vy; }
+            if(!ball.moving) return;
+
+            // 低重力判定
+            s.obs.forEach(o => { if(o.t==='lowG' && ball.x > o.x*width && ball.x < o.x*width+o.w && ball.y > o.y*height && ball.y < o.y*height+o.h) currentG = 0.15; });
+
+            ball.vy += currentG; ball.x += ball.vx; ball.y += ball.vy;
+
+            const gY = s.groundY * height, hL = s.holeX * width - s.holeW/2, hR = s.holeX * width + s.holeW/2;
+
+            s.obs.forEach(o => {
+                if(o.t==='rot') {
+                    o.a = (o.a || 0) + o.s;
+                    let x2 = o.x*width + Math.cos(o.a)*o.l, y2 = o.y*height + Math.sin(o.a)*o.l;
+                    let dx = x2-o.x*width, dy = y2-o.y*height, l2 = dx*dx+dy*dy;
+                    let t = Math.max(0, Math.min(1, ((ball.x-o.x*width)*dx+(ball.y-o.y*height)*dy)/l2));
+                    if(Math.hypot(ball.x-(o.x*width+t*dx), ball.y-(o.y*height+t*dy)) < ball.r) { ball.vx*=-1.2; ball.vy*=-1.2; }
                 }
-                if (ob.type === 'block') {
-                    const bx = ob.x*width, by = ob.y*height, bw = ob.w, bh = ob.h;
-                    if (ball.x+ball.r > bx && ball.x-ball.r < bx+bw && ball.y+ball.r > by && ball.y-ball.r < by+bh) {
-                        const ovL = (ball.x + ball.r) - bx, ovR = (bx + bw) - (ball.x - ball.r), ovT = (ball.y + ball.r) - by, ovB = (by + bh) - (ball.y - ball.r);
-                        const min = Math.min(ovL, ovR, ovT, ovB);
-                        if (min === ovL) { ball.x = bx - ball.r; ball.vx *= -0.7; }
-                        else if (min === ovR) { ball.x = bx + bw + ball.r; ball.vx *= -0.7; }
-                        else if (min === ovT) { ball.y = by - ball.r; ball.vy *= -0.4; ball.vx *= 0.8; }
-                        else { ball.y = by + bh + ball.r; ball.vy *= -0.4; }
+                if(o.t==='block' || o.t==='move') {
+                    if(o.t==='move') { o.curX = (o.curX || o.x*width) + (o.dir || 1)*o.s; if(o.curX > o.x*width+o.r || o.curX < o.x*width) o.dir = (o.dir || 1)*-1; }
+                    let bx = o.t==='move' ? o.curX : o.x*width, by = o.y*height, bw = o.w, bh = o.h;
+                    if(ball.x+ball.r > bx && ball.x-ball.r < bx+bw && ball.y+ball.r > by && ball.y-ball.r < by+bh) {
+                        if(Math.abs(ball.y - by) < 10) { ball.vy *= -0.5; ball.y = by - ball.r; if(o.t==='move') ball.vx += (o.dir*o.s); } else { ball.vx *= -0.7; }
                     }
                 }
-                if (ob.type === 'spike') { if (!ball.inHole && ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5) resetStage(); }
+                if(o.t==='accel' && ball.x > o.x*width && ball.x < o.x*width+o.w && Math.abs(ball.y+ball.r - gY) < 10) { ball.vx = o.p; }
+                if(o.t==='warp' && Math.hypot(ball.x-o.x*width, ball.y-o.y*height) < 25) { ball.x = o.tx*width; ball.y = o.ty*height; }
+                if(o.t==='spike' && ball.x > o.x*width && ball.x < o.x*width+o.w && ball.y+ball.r > gY-5 && !ball.inHole) resetStage();
             });
 
-            if (ball.y + ball.r > gY) {
-                if (ball.x > hL && ball.x < hR) { ball.inHole = true; ball.vx *= 0.96; }
-                else if (!ball.inHole) { ball.y = gY - ball.r; ball.vy *= -0.3; ball.vx *= 0.9; }
+            if(ball.y + ball.r > gY) {
+                if(ball.x > hL && ball.x < hR) { ball.inHole = true; ball.vx *= 0.9; }
+                else if(!ball.inHole) { ball.y = gY-ball.r; ball.vy *= -0.3; ball.vx *= 0.8; }
             }
-            if (ball.inHole && ball.y > gY) {
-                if (ball.x - ball.r < hL) { ball.x = hL + ball.r; ball.vx *= -0.5; }
-                if (ball.x + ball.r > hR) { ball.x = hR - ball.r; ball.vx *= -0.5; }
-            }
-
-            if (ball.y > height + 50) { 
-                if (ball.inHole) {
-                    if (currentStage < stages.length - 1) { currentStage++; } 
-                    else { alert("祝！20ステージ完全制覇！"); currentStage = 0; }
-                }
-                resetStage();
-            }
-            if (ball.x < -20 || ball.x > width + 20) resetStage();
-            if (Math.hypot(ball.vx, ball.vy) < 0.2 && !ball.inHole) ball.moving = false;
+            if(ball.y > height + 50) { if(ball.inHole) { currentStage = (currentStage+1)%20; } resetStage(); }
+            if(ball.x < -20 || ball.x > width+20) resetStage();
         }
 
         function draw() {
             ctx.clearRect(0, 0, width, height);
             const s = stages[currentStage];
-            const gY = s.groundY * height, hL = s.holeX * width - s.holeW / 2, hW = s.holeW;
-            ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(hL, gY, hW, height - gY);
-            ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, gY, hL, height - gY); ctx.fillRect(hL + hW, gY, width, height - gY);
-            s.obstacles.forEach(ob => {
-                if (ob.type === 'rotator') {
-                    ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 10; ctx.lineCap = "round";
-                    ctx.beginPath(); ctx.moveTo(ob.x * width, ob.y * height);
-                    ctx.lineTo(ob.x * width + Math.cos(ob.angle) * ob.length, ob.y * height + Math.sin(ob.angle) * ob.length); ctx.stroke();
-                }
-                if (ob.type === 'block') { ctx.fillStyle = "#95a5a6"; ctx.fillRect(ob.x*width, ob.y*height, ob.w, ob.h); }
-                if (ob.type === 'spike') {
-                    ctx.fillStyle = "#e74c3c";
-                    for(let i=0; i<ob.w; i+=20) { ctx.beginPath(); ctx.moveTo(ob.x*width+i, gY); ctx.lineTo(ob.x*width+i+10, gY-15); ctx.lineTo(ob.x*width+i+20, gY); ctx.fill(); }
-                }
+            const gY = s.groundY*height, hX = s.holeX*width, hW = s.holeW;
+
+            // 地面と穴
+            ctx.fillStyle = "#27ae60"; ctx.fillRect(0, gY, width, height-gY);
+            ctx.fillStyle = "#1a1a2e"; ctx.fillRect(hX-hW/2, gY, hW, 20);
+
+            s.obs.forEach(o => {
+                if(o.t==='rot') { ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(o.x*width, o.y*height); ctx.lineTo(o.x*width+Math.cos(o.a)*o.l, o.y*height+Math.sin(o.a)*o.l); ctx.stroke(); }
+                if(o.t==='block') { ctx.fillStyle = "#95a5a6"; ctx.fillRect(o.x*width, o.y*height, o.w, o.h); }
+                if(o.t==='move') { ctx.fillStyle = "#3498db"; ctx.fillRect(o.curX, o.y*height, o.w, o.h); }
+                if(o.t==='accel') { ctx.fillStyle = "#e67e22"; ctx.fillRect(o.x*width, gY-5, o.w, 5); }
+                if(o.t==='warp') { ctx.fillStyle = "#9b59b6"; ctx.beginPath(); ctx.arc(o.x*width, o.y*height, 15, 0, Math.PI*2); ctx.fill(); }
+                if(o.t==='lowG') { ctx.fillStyle = "rgba(52,152,219,0.2)"; ctx.fillRect(o.x*width, o.y*height, o.w, o.h); }
+                if(o.t==='spike') { ctx.fillStyle = "#e74c3c"; for(let j=0; j<o.w; j+=15) { ctx.beginPath(); ctx.moveTo(o.x*width+j, gY); ctx.lineTo(o.x*width+j+7, gY-15); ctx.lineTo(o.x*width+j+15, gY); ctx.fill(); } }
             });
-            if (touch.start) {
-                let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.curr.x)*0.14, vy: (touch.start.y - touch.curr.y)*0.14 };
-                ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.setLineDash([5,5]); ctx.moveTo(pv.x, pv.y);
-                for(let i=0; i<30; i++) { pv.vy += gravity; pv.x += pv.vx; pv.y += pv.vy; ctx.lineTo(pv.x, pv.y); }
+
+            if(touch.start) {
+                ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.setLineDash([5,5]);
+                let pv = {x:ball.x, y:ball.y, vx:(touch.start.x-touch.curr.x)*0.13, vy:(touch.start.y-touch.curr.y)*0.13};
+                ctx.moveTo(pv.x, pv.y);
+                for(let k=0; k<25; k++) { pv.vy+=gravity; pv.x+=pv.vx; pv.y+=pv.vy; ctx.lineTo(pv.x, pv.y); }
                 ctx.stroke(); ctx.setLineDash([]);
             }
-            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
-            ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
+
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = "black"; ctx.stroke();
+
             update(); requestAnimationFrame(draw);
         }
-
-        window.addEventListener('resize', resize);
-        resize(); draw();
+        window.addEventListener('resize', resize); resize();
     </script>
 </body>
 </html>
