@@ -2,27 +2,22 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Pull Golf - ver 1.1.0</title>
+    <title>Pull Golf - ver 1.2.0</title>
     <style>
-        body { text-align: center; background-color: #87CEEB; color: #333; font-family: 'Helvetica', sans-serif; margin: 0; overflow: hidden; }
-        canvas { background: linear-gradient(#a2d2ff, #e1f5fe); border-bottom: 50px solid #2ecc71; cursor: crosshair; touch-action: none; }
-        .ui { position: absolute; top: 10px; width: 100%; pointer-events: none; text-shadow: 1px 1px 2px white; }
-        .version-tag { position: absolute; top: 5px; left: 10px; font-size: 12px; color: #555; }
-        .controls { position: absolute; bottom: 60px; right: 20px; pointer-events: auto; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #fff; border: 2px solid #333; border-radius: 5px; }
+        body { text-align: center; background: #222; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
+        canvas { background: linear-gradient(#1a2a6c, #b21f1f, #fdbb2d); border-bottom: 4px solid #111; touch-action: none; }
+        .ui { position: absolute; top: 15px; width: 100%; pointer-events: none; }
+        .v-tag { position: absolute; top: 5px; left: 10px; font-size: 12px; opacity: 0.6; }
+        .btn { position: absolute; bottom: 20px; right: 20px; pointer-events: auto; padding: 12px; background: rgba(255,255,255,0.2); border: 1px solid white; color: white; cursor: pointer; border-radius: 8px; }
     </style>
 </head>
 <body>
-    <div class="version-tag">ver 1.1.0</div>
+    <div class="v-tag">ver 1.2.0 - Terrain & Logic Update</div>
     <div class="ui">
-        <h1>PULL GOLF</h1>
-        <div id="stats" style="font-size: 20px;">Stage: <span id="stageNum">1</span> | Strokes: <span id="strokes">0</span></div>
+        <h2 id="msg">Stage <span id="stNum">1</span>: 起伏を越えろ</h2>
+        <div style="font-size: 18px;">Power: <span id="pwr">0</span>% | Strokes: <span id="strk">0</span></div>
     </div>
-    
-    <div class="controls">
-        <button onclick="resetStage()">R: やり直し</button>
-    </div>
-
+    <button class="btn" onclick="initStage()">ステージをやり直す</button>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -31,75 +26,77 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // ゲーム定数
-        const gravity = 0.4;
-        const friction = 0.98;
-        const bounce = -0.6;
-        const groundY = canvas.height - 50;
-
-        // ゲーム状態
-        let currentStage = 0;
-        let strokes = 0;
-        let isDragging = false;
-        let startPos = { x: 0, y: 0 };
-        let currentPos = { x: 0, y: 0 };
-        let ball = { x: 100, y: 0, radius: 12, vx: 0, vy: 0, moving: false };
-
-        // ステージデータ (wallsのtypeに'moving'を指定可能に)
+        let ball = { x: 100, y: 0, r: 12, vx: 0, vy: 0, moving: false };
+        let state = { stage: 0, strokes: 0, dragStart: null, dragCurrent: null };
+        
+        // ステージ設計：[x, y, width, height]
         const stages = [
-            { holeX: canvas.width - 150, walls: [] }, 
-            { holeX: canvas.width - 100, walls: [{ x: canvas.width/2, y: groundY - 120, w: 20, h: 120, type: 'static' }] },
-            { holeX: canvas.width - 80,  walls: [
-                { x: 300, y: groundY - 200, w: 30, h: 200, type: 'static' },
-                { x: 600, y: groundY - 100, w: 150, h: 20, type: 'moving', range: 100, speed: 0.05, baseTop: groundY - 100 }
-            ]}
+            { 
+                name: "丘を越えて", hole: {x: 800, y: -20}, 
+                terrains: [{x: 0, y: 0, w: 300, h: 100}, {x: 300, y: -100, w: 200, h: 200}, {x: 500, y: 0, w: 400, h: 100}],
+                moving: []
+            },
+            { 
+                name: "動くリフト", hole: {x: 850, y: -120}, 
+                terrains: [{x: 0, y: 0, w: 200, h: 100}, {x: 750, y: -100, w: 200, h: 200}],
+                moving: [{x: 300, y: 0, w: 100, h: 20, range: 400, speed: 0.02, axis: 'x'}]
+            }
         ];
 
+        const gravity = 0.45;
+        const groundBase = canvas.height - 100;
+
         function initStage() {
-            const s = stages[currentStage];
-            ball.x = 100;
-            ball.y = groundY - ball.radius;
-            ball.vx = 0;
-            ball.vy = 0;
-            ball.moving = false;
-            document.getElementById('stageNum').innerText = currentStage + 1;
+            const s = stages[state.stage];
+            ball.x = 80;
+            ball.y = groundBase - 150;
+            ball.vx = 0; ball.vy = 0; ball.moving = false;
+            state.strokes = 0;
+            document.getElementById('stNum').innerText = state.stage + 1;
+            document.getElementById('msg').innerText = s.name;
+            updateUI();
         }
 
-        function resetStage() {
-            strokes = 0;
-            document.getElementById('strokes').innerText = strokes;
-            initStage();
-        }
-
-        // イベント管理
-        canvas.addEventListener('mousedown', (e) => {
+        // --- 入力処理 ---
+        canvas.addEventListener('mousedown', e => {
             if (ball.moving) return;
-            startPos = {x: e.clientX, y: e.clientY};
-            currentPos = {x: e.clientX, y: e.clientY};
-            isDragging = true;
+            state.dragStart = { x: e.clientX, y: e.clientY };
+            state.dragCurrent = { x: e.clientX, y: e.clientY };
         });
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (isDragging) currentPos = {x: e.clientX, y: e.clientY};
+        window.addEventListener('mousemove', e => {
+            if (state.dragStart) state.dragCurrent = { x: e.clientX, y: e.clientY };
         });
 
         window.addEventListener('mouseup', () => {
-            if (isDragging) {
-                ball.vx = (startPos.x - currentPos.x) * 0.12;
-                ball.vy = (startPos.y - currentPos.y) * 0.12;
+            if (state.dragStart && state.dragCurrent) {
+                const dx = state.dragStart.x - state.dragCurrent.x;
+                const dy = state.dragStart.y - state.dragCurrent.y;
+                ball.vx = dx * 0.12;
+                ball.vy = dy * 0.12;
                 ball.moving = true;
-                isDragging = false;
-                strokes++;
-                document.getElementById('strokes').innerText = strokes;
+                state.strokes++;
+                updateUI();
             }
+            state.dragStart = null;
         });
 
+        function updateUI() {
+            document.getElementById('strk').innerText = state.strokes;
+            if (state.dragStart) {
+                const d = Math.min(100, Math.hypot(state.dragStart.x - state.dragCurrent.x, state.dragStart.y - state.dragCurrent.y) / 2);
+                document.getElementById('pwr').innerText = Math.floor(d);
+            } else {
+                document.getElementById('pwr').innerText = 0;
+            }
+        }
+
         function update() {
-            // 動く壁の更新
-            stages[currentStage].walls.forEach(w => {
-                if (w.type === 'moving') {
-                    w.y = w.baseTop + Math.sin(Date.now() * w.speed * 0.05) * w.range;
-                }
+            const s = stages[state.stage];
+
+            // 動くギミックの更新
+            s.moving.forEach(m => {
+                if (m.axis === 'x') m.curX = m.x + Math.sin(Date.now() * m.speed * 0.1) * m.range/2 + m.range/2;
             });
 
             if (ball.moving) {
@@ -107,74 +104,68 @@
                 ball.x += ball.vx;
                 ball.y += ball.vy;
 
-                // 地面
-                if (ball.y + ball.radius > groundY) {
-                    ball.y = groundY - ball.radius;
-                    ball.vy *= bounce;
-                    ball.vx *= friction;
-                }
-
-                // 衝突判定（壁）
-                stages[currentStage].walls.forEach(w => {
-                    if (ball.x + ball.radius > w.x && ball.x - ball.radius < w.x + w.w &&
-                        ball.y + ball.radius > w.y && ball.y - ball.radius < w.y + w.h) {
-                        ball.vx *= -0.8;
-                        ball.x += (ball.vx > 0 ? 5 : -5); // 埋まり回避
+                // 地形との当たり判定
+                let onGround = false;
+                [...s.terrains, ...s.moving.map(m => ({x: m.curX || m.x, y: m.y, w: m.w, h: m.h}))].forEach(t => {
+                    const tx = t.x; const ty = groundBase + t.y;
+                    if (ball.x > tx && ball.x < tx + t.w && ball.y + ball.r > ty && ball.y - ball.r < ty + t.h) {
+                        if (ball.vy > 0) {
+                            ball.y = ty - ball.r;
+                            ball.vy *= -0.4;
+                            ball.vx *= 0.95;
+                            onGround = true;
+                        } else {
+                            ball.vx *= -0.5;
+                        }
                     }
                 });
 
-                // 停止判定
-                if (Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.2 && ball.y >= groundY - ball.radius) {
+                // 画面外・停止判定
+                if (ball.y > canvas.height) initStage();
+                if (Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.2 && onGround) {
                     ball.vx = 0; ball.vy = 0; ball.moving = false;
                 }
             }
 
-            // 穴
-            const hX = stages[currentStage].holeX;
-            if (Math.hypot(ball.x - hX, ball.y - groundY) < 25 && Math.abs(ball.vx) < 2) {
-                alert(`Stage ${currentStage + 1} Clear!\nStrokes: ${strokes}`);
-                currentStage = (currentStage + 1) % stages.length;
-                strokes = 0;
-                document.getElementById('strokes').innerText = strokes;
+            // クリア判定
+            const hX = s.hole.x; const hY = groundBase + s.hole.y;
+            if (Math.hypot(ball.x - hX, ball.y - hY) < 25 && Math.abs(ball.vx) < 2) {
+                alert("Nice Shot!");
+                state.stage = (state.stage + 1) % stages.length;
                 initStage();
             }
+            updateUI();
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const s = stages[state.stage];
+
+            // 地形の描画
+            ctx.fillStyle = "#2ecc71";
+            s.terrains.forEach(t => ctx.fillRect(t.x, groundBase + t.y, t.w, t.h));
+            
+            // 動くリフト
+            ctx.fillStyle = "#f1c40f";
+            s.moving.forEach(m => ctx.fillRect(m.curX, groundBase + m.y, m.w, m.h));
 
             // 穴
-            ctx.fillStyle = "#333";
-            ctx.beginPath();
-            ctx.arc(stages[currentStage].holeX, groundY, 20, Math.PI, 0);
-            ctx.fill();
+            ctx.fillStyle = "#111";
+            ctx.beginPath(); ctx.arc(s.hole.x, groundBase + s.hole.y + 10, 20, 0, Math.PI*2); ctx.fill();
 
-            // 壁
-            ctx.fillStyle = "#5d4037";
-            stages[currentStage].walls.forEach(w => {
-                ctx.fillRect(w.x, w.y, w.w, w.h);
-            });
-
-            // 引っ張りライン
-            if (isDragging) {
+            // ガイドライン
+            if (state.dragStart) {
                 ctx.beginPath();
                 ctx.moveTo(ball.x, ball.y);
-                ctx.lineTo(ball.x + (startPos.x - currentPos.x), ball.y + (startPos.y - currentPos.y));
-                ctx.strokeStyle = "white";
-                ctx.setLineDash([5, 5]);
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.setLineDash([]);
+                ctx.lineTo(ball.x + (state.dragStart.x - state.dragCurrent.x), ball.y + (state.dragStart.y - state.dragCurrent.y));
+                ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                ctx.lineWidth = 3; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
 
             // ボール
             ctx.beginPath();
-            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-            ctx.fillStyle = "white";
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "#333";
-            ctx.stroke();
+            ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+            ctx.fillStyle = "white"; ctx.fill();
 
             update();
             requestAnimationFrame(draw);
