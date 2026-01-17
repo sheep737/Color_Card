@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master - ver 3.1.0</title>
+    <title>Pull Golf Master - ver 3.1.1</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
         canvas { display: block; background: linear-gradient(#0f2027, #203a43, #2c5364); touch-action: none; }
         .ui { position: absolute; top: 40px; width: 100%; text-align: center; color: white; pointer-events: none; }
-        .btn { position: absolute; bottom: 30px; left: 20px; padding: 12px 24px; background: white; border: none; border-radius: 25px; font-weight: bold; pointer-events: auto; box-shadow: 0 4px #666; }
+        .btn { position: absolute; bottom: 30px; left: 20px; padding: 12px 24px; background: white; border: none; border-radius: 25px; font-weight: bold; pointer-events: auto; }
     </style>
 </head>
 <body>
@@ -24,7 +24,7 @@
 
         let width, height;
         let currentStage = 0;
-        let ball = { x: 0, y: 0, r: 14, vx: 0, vy: 0, moving: false, inHole: false };
+        let ball = { x: 0, y: 0, r: 13, vx: 0, vy: 0, moving: false, inHole: false };
         let touch = { start: null, curr: null };
 
         const stages = [
@@ -34,13 +34,13 @@
             { name: "Stage 4", hint: "二つの回転", holeX: 0.8, holeW: 80, groundY: 0.8, obstacles: [{ type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 }, { type: 'rotator', x: 0.8, y: 0.4, length: 90, angle: Math.PI, speed: -0.08 }, { type: 'spike', x: 0.6, y: 0.78, w: 50 }] },
             { 
                 name: "Stage 5: グラビティ・ピット",
-                hint: "上の動く足場に当てて運ぼう",
+                hint: "トゲを避けて壁の向こうへ！",
                 holeX: 0.9, holeW: 60, groundY: 0.8,
                 obstacles: [
-                    { type: 'block', x: 0.4, y: 0.4, w: 20, h: 350 }, // 巨大な左壁
-                    { type: 'block', x: 0.7, y: 0.4, w: 20, h: 350 }, // 巨大な右壁（穴の直前）
-                    { type: 'rotator', x: 0.55, y: 0.2, length: 120, angle: 0, speed: 0.04 }, // 空中の輸送バー
-                    { type: 'spike', x: 0.42, y: 0.78, w: 220 } // 壁に挟まれた死の谷
+                    { type: 'block', x: 0.4, y: 0.45, w: 20, h: 300 },
+                    { type: 'block', x: 0.75, y: 0.55, w: 20, h: 200 }, // 右壁を少し低く調整
+                    { type: 'rotator', x: 0.58, y: 0.25, length: 110, angle: 0, speed: 0.045 },
+                    { type: 'spike', x: 0.42, y: 0.78, w: 140 } // 穴(0.9)に被らないよう幅を140に制限
                 ]
             }
         ];
@@ -92,7 +92,10 @@
                         else { ball.y = by + bh + ball.r; ball.vy *= -0.4; }
                     }
                 }
-                if (ob.type === 'spike') { if (ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5 && !ball.inHole) resetStage(); }
+                if (ob.type === 'spike') { 
+                    // トゲの判定を厳密に。穴のinHoleフラグが立っている間は無視
+                    if (!ball.inHole && ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5) resetStage(); 
+                }
             });
 
             if (ball.y + ball.r > gY) {
@@ -104,7 +107,7 @@
                 if (ball.x + ball.r > hR) { ball.x = hR - ball.r; ball.vx *= -0.5; }
             }
 
-            if (ball.y > height + 50) { if (ball.inHole) { alert("CONGRATULATIONS! ALL CLEAR!"); currentStage = (currentStage + 1) % stages.length; } resetStage(); }
+            if (ball.y > height + 50) { if (ball.inHole) { alert("全ステージクリア！おめでとうございます！"); currentStage = 0; } resetStage(); }
             if (ball.x < -20 || ball.x > width + 20) resetStage();
             if (Math.hypot(ball.vx, ball.vy) < 0.2 && !ball.inHole) ball.moving = false;
         }
