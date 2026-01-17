@@ -2,25 +2,23 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Pull Golf - ver 1.4.0</title>
+    <title>Pull Golf - ver 1.5.0</title>
     <style>
-        body { text-align: center; background: #111; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
-        canvas { background: #1a2a6c; background: linear-gradient(to bottom, #1a2a6c, #2a5298); touch-action: none; }
-        .hud { position: absolute; top: 20px; left: 0; width: 100%; pointer-events: none; }
-        .v-tag { position: absolute; bottom: 10px; left: 10px; font-size: 12px; color: #777; }
-        .controls { position: absolute; bottom: 20px; right: 20px; }
-        button { padding: 12px 20px; cursor: pointer; border-radius: 8px; border: none; background: #fff; font-weight: bold; }
+        body { text-align: center; background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
+        canvas { background: #1e3c72; background: linear-gradient(to bottom, #1e3c72, #2a5298); touch-action: none; }
+        .hud { position: absolute; top: 20px; width: 100%; pointer-events: none; }
+        .v-tag { position: absolute; bottom: 10px; left: 10px; font-size: 12px; color: #555; }
+        button { position: absolute; top: 20px; right: 20px; padding: 10px 20px; cursor: pointer; border-radius: 20px; border: none; background: #fff; font-weight: bold; box-shadow: 0 4px #ccc; }
+        button:active { transform: translateY(2px); box-shadow: 0 2px #ccc; }
     </style>
 </head>
 <body>
-    <div class="v-tag">ver 1.4.0 - Touch Anchor System</div>
+    <div class="v-tag">ver 1.5.0 - Trajectory & Auto-In Update</div>
     <div class="hud">
         <h2 id="msg">Stage 1</h2>
-        <div id="status">どこかをタッチして引っ張って！</div>
+        <div id="status">点線を穴に合わせて放そう！</div>
     </div>
-    <div class="controls">
-        <button onclick="resetStage()">リトライ</button>
-    </div>
+    <button onclick="resetStage()">リトライ</button>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -30,43 +28,27 @@
         canvas.height = window.innerHeight;
 
         const gravity = 0.4;
-        const groundY = canvas.height - 60;
+        const groundY = canvas.height - 80;
         let currentStage = 0;
         
-        // 物理オブジェクト
         let ball = { x: 100, y: groundY - 15, r: 12, vx: 0, vy: 0, moving: false };
-        let anchor = null; // タッチした起点
-        let dragPos = null; // 現在の指の位置
+        let anchor = null;
+        let dragPos = null;
 
         const stages = [
-            { name: "スリングショット練習", hole: {x: 800, y: groundY}, walls: [], zones: [] },
-            { 
-                name: "動く足場と谷", hole: {x: 900, y: groundY}, 
-                walls: [{x: 400, y: groundY-100, w: 100, h: 20, type: 'lift', range: 150, speed: 0.03, base: groundY-100}] ,
-                zones: []
-            },
-            { 
-                name: "向かい風の丘", hole: {x: 950, y: groundY-200}, 
-                walls: [{x: 800, y: groundY-200, w: 200, h: 200}],
-                zones: [{x: 400, y: 0, w: 300, h: canvas.height, type: 'wind', force: -0.2}]
-            }
+            { name: "まずは真っ直ぐ狙おう", hole: {x: canvas.width - 200, y: groundY}, walls: [] },
+            { name: "壁を飛び越えて", hole: {x: canvas.width - 150, y: groundY}, walls: [{x: canvas.width/2, y: groundY-120, w: 40, h: 120}] },
+            { name: "リフトで運ぶ", hole: {x: canvas.width - 150, y: groundY - 250}, 
+              walls: [{x: 400, y: groundY-50, w: 150, h: 20, type: 'lift', range: 200, speed: 0.02, base: groundY-50},
+                      {x: canvas.width - 300, y: groundY-250, w: 300, h: 20}] }
         ];
 
-        // --- 操作イベント ---
-        function onStart(x, y) {
-            if (ball.moving) return;
-            anchor = { x, y };
-            dragPos = { x, y };
-        }
-        function onMove(x, y) {
-            if (anchor) dragPos = { x, y };
-        }
+        function onStart(x, y) { if (!ball.moving) { anchor = { x, y }; dragPos = { x, y }; } }
+        function onMove(x, y) { if (anchor) dragPos = { x, y }; }
         function onEnd() {
             if (anchor && dragPos) {
-                const dx = anchor.x - dragPos.x;
-                const dy = anchor.y - dragPos.y;
-                ball.vx = dx * 0.15;
-                ball.vy = dy * 0.15;
+                ball.vx = (anchor.x - dragPos.x) * 0.12;
+                ball.vy = (anchor.y - dragPos.y) * 0.12;
                 ball.moving = true;
             }
             anchor = null; dragPos = null;
@@ -81,59 +63,44 @@
 
         function update() {
             const s = stages[currentStage];
-
-            // ギミック更新
-            s.walls.forEach(w => {
-                if (w.type === 'lift') w.y = w.base + Math.sin(Date.now() * w.speed * 0.1) * w.range;
-            });
+            s.walls.forEach(w => { if (w.type === 'lift') w.y = w.base + Math.sin(Date.now() * w.speed) * w.range; });
 
             if (ball.moving) {
                 ball.vy += gravity;
-                
-                // ゾーン効果（風など）
-                s.zones.forEach(z => {
-                    if (ball.x > z.x && ball.x < z.x + z.w) {
-                        if (z.type === 'wind') ball.vx += z.force;
-                    }
-                });
-
                 ball.x += ball.vx;
                 ball.y += ball.vy;
 
-                // 地面衝突
-                if (ball.y + ball.r > groundY) {
-                    ball.y = groundY - ball.r;
-                    ball.vy *= -0.4;
-                    ball.vx *= 0.96;
+                // 穴への吸い込み（ホーミング）
+                const distToHole = Math.hypot(ball.x - s.hole.x, ball.y - s.hole.y);
+                if (distToHole < 50) {
+                    ball.vx += (s.hole.x - ball.x) * 0.05;
+                    ball.vy += (s.hole.y - ball.y) * 0.05;
                 }
 
-                // 壁衝突
+                if (ball.y + ball.r > groundY) {
+                    ball.y = groundY - ball.r;
+                    ball.vy *= -0.3; ball.vx *= 0.95;
+                }
+
                 s.walls.forEach(w => {
-                    if (ball.x + ball.r > w.x && ball.x - ball.r < w.x + w.w &&
-                        ball.y + ball.r > w.y && ball.y - ball.r < w.y + w.h) {
-                        if (ball.y < w.y + 10) { // 上に乗る
-                            ball.y = w.y - ball.r;
-                            ball.vy *= -0.3;
-                            ball.vx *= 0.95;
-                        } else {
-                            ball.vx *= -0.6;
-                        }
+                    if (ball.x + ball.r > w.x && ball.x - ball.r < w.x + w.w && ball.y + ball.r > w.y && ball.y - ball.r < w.y + w.h) {
+                        if (ball.y < w.y + 15) { ball.y = w.y - ball.r; ball.vy *= -0.2; ball.vx *= 0.9; }
+                        else { ball.vx *= -0.5; }
                     }
                 });
 
-                // 停止判定
                 if (Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.5) {
                     ball.moving = false;
-                    ball.vx = 0; ball.vy = 0;
+                    if (distToHole < 25) nextStage();
                 }
             }
+            if (ball.y > canvas.height || ball.x < 0 || ball.x > canvas.width) resetStage();
+        }
 
-            // クリア判定
-            if (!ball.moving && Math.hypot(ball.x - s.hole.x, ball.y - s.hole.y) < 30) {
-                alert("ステージクリア！");
-                currentStage = (currentStage + 1) % stages.length;
-                resetStage();
-            }
+        function nextStage() {
+            alert("Nice In!");
+            currentStage = (currentStage + 1) % stages.length;
+            resetStage();
         }
 
         function draw() {
@@ -141,59 +108,40 @@
             const s = stages[currentStage];
             document.getElementById('msg').innerText = s.name;
 
-            // ゾーン描画（風など）
-            s.zones.forEach(z => {
-                ctx.fillStyle = z.type === 'wind' ? "rgba(255, 255, 0, 0.1)" : "rgba(255,0,0,0.1)";
-                ctx.fillRect(z.x, z.y, z.w, z.h);
-            });
-
-            // 地面と穴
-            ctx.fillStyle = "#27ae60";
-            ctx.fillRect(0, groundY, canvas.width, 60);
+            // 穴
             ctx.fillStyle = "#111";
             ctx.beginPath(); ctx.arc(s.hole.x, s.hole.y, 20, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = "#fff"; ctx.stroke();
 
-            // 壁
-            ctx.fillStyle = "#ecf0f1";
-            s.walls.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
+            // 地面と壁
+            ctx.fillStyle = "#27ae60"; ctx.fillRect(0, groundY, canvas.width, 80);
+            ctx.fillStyle = "#ecf0f1"; s.walls.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
 
-            // ★ 新・引っ張り演出（パチンコ風）
+            // 予測線（放物線）
             if (anchor && dragPos) {
-                const dx = anchor.x - dragPos.x;
-                const dy = anchor.y - dragPos.y;
-
-                // 起点の円
-                ctx.strokeStyle = "rgba(255,255,255,0.4)";
-                ctx.beginPath(); ctx.arc(anchor.x, anchor.y, 10, 0, Math.PI*2); ctx.stroke();
-                
-                // 引っ張りゴム
+                let pv = { x: ball.x, y: ball.y, vx: (anchor.x - dragPos.x) * 0.12, vy: (anchor.y - dragPos.y) * 0.12 };
                 ctx.beginPath();
-                ctx.moveTo(anchor.x, anchor.y);
-                ctx.lineTo(dragPos.x, dragPos.y);
-                ctx.setLineDash([2, 2]);
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                ctx.moveTo(pv.x, pv.y);
+                for (let i = 0; i < 30; i++) {
+                    pv.vy += gravity; pv.x += pv.vx; pv.y += pv.vy;
+                    ctx.lineTo(pv.x, pv.y);
+                }
                 ctx.stroke();
                 ctx.setLineDash([]);
-
-                // ボールからの射出予測線
-                ctx.beginPath();
-                ctx.moveTo(ball.x, ball.y);
-                ctx.lineTo(ball.x + dx, ball.y + dy);
-                ctx.strokeStyle = "rgba(255,255,0,0.8)";
-                ctx.lineWidth = 3;
-                ctx.stroke();
             }
 
             // ボール
-            ctx.fillStyle = "white";
-            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
 
             update();
             requestAnimationFrame(draw);
         }
 
         function resetStage() {
-            ball.x = 100; ball.y = groundY - 15;
-            ball.vx = 0; ball.vy = 0; ball.moving = false;
+            ball.x = 100; ball.y = groundY - 15; ball.vx = 0; ball.vy = 0; ball.moving = false;
             anchor = null; dragPos = null;
         }
 
