@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master - ver 2.8.0</title>
+    <title>Pull Golf Master - ver 2.9.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
@@ -24,35 +24,33 @@
 
         let width, height;
         let currentStage = 0;
-        let ball = { x: 0, y: 0, r: 13, vx: 0, vy: 0, moving: false, inHole: false };
+        let ball = { x: 0, y: 0, r: 14, vx: 0, vy: 0, moving: false, inHole: false };
         let touch = { start: null, curr: null };
 
         const stages = [
             { 
-                name: "Stage 1: 高い壁を越えて",
-                hint: "高く打ち上げないと穴まで届かないよ",
+                name: "Stage 1: 基本の放物線",
+                hint: "高い壁を飛び越えよう",
                 holeX: 0.85, holeW: 80, groundY: 0.8,
-                obstacles: [
-                    { type: 'block', x: 0.45, y: 0.5, w: 30, h: 200 } // 中央の高い壁
-                ]
+                obstacles: [{ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 }]
             },
             { 
-                name: "Stage 2: 振り子の試練",
-                hint: "バーが水平になる瞬間を見極めて！",
+                name: "Stage 2: タイミングの試練",
+                hint: "回転バーを避けて落とせ",
                 holeX: 0.75, holeW: 90, groundY: 0.8,
                 obstacles: [
-                    { type: 'rotator', x: 0.75, y: 0.45, length: 110, angle: 0, speed: 0.07 }, // 穴の真上の長いバー
-                    { type: 'spike', x: 0.3, y: 0.78, w: 100 } // スタート直後のトゲ
+                    { type: 'rotator', x: 0.75, y: 0.45, length: 100, angle: 0, speed: 0.07 },
+                    { type: 'spike', x: 0.25, y: 0.78, w: 100 }
                 ]
             },
             { 
-                name: "Stage 3: リバウンド・ショット",
-                hint: "天井のブロックに当てて穴に落とそう",
-                holeX: 0.9, holeW: 60, groundY: 0.8,
+                name: "Stage 3: テクニカルショット",
+                hint: "トゲを越え、天井を使って穴へ",
+                holeX: 0.9, holeW: 70, groundY: 0.8,
                 obstacles: [
-                    { type: 'block', x: 0.7, y: 0.3, w: 150, h: 30 }, // 天井の反射板
-                    { type: 'block', x: 0.7, y: 0.6, w: 20, h: 100 }, // 穴の手前の仕切り
-                    { type: 'spike', x: 0.8, y: 0.78, w: 40 } // 穴のフチのトゲ
+                    { type: 'block', x: 0.6, y: 0.2, w: 200, h: 40 }, // 天井反射板
+                    { type: 'block', x: 0.7, y: 0.65, w: 25, h: 100 }, // 穴の手前の壁
+                    { type: 'spike', x: 0.55, y: 0.78, w: 60 } // 穴のかなり手前のトゲ
                 ]
             }
         ];
@@ -87,36 +85,24 @@
 
             s.obstacles.forEach(ob => {
                 if (ob.type === 'rotator') {
-                    const x2 = ob.x * width + Math.cos(ob.angle) * ob.length;
-                    const y2 = ob.y * height + Math.sin(ob.angle) * ob.length;
-                    const dx = x2 - ob.x*width, dy = y2 - ob.y*height;
-                    const l2 = dx*dx + dy*dy;
-                    let t = ((ball.x - ob.x*width) * dx + (ball.y - ob.y*height) * dy) / l2;
-                    t = Math.max(0, Math.min(1, t));
+                    const x2 = ob.x * width + Math.cos(ob.angle) * ob.length, y2 = ob.y * height + Math.sin(ob.angle) * ob.length;
+                    const dx = x2 - ob.x*width, dy = y2 - ob.y*height, l2 = dx*dx + dy*dy;
+                    let t = Math.max(0, Math.min(1, ((ball.x - ob.x*width) * dx + (ball.y - ob.y*height) * dy) / l2));
                     const closestX = ob.x*width + t * dx, closestY = ob.y*height + t * dy;
-                    if (Math.hypot(ball.x - closestX, ball.y - closestY) < ball.r) {
-                        ball.vx *= -1.2; ball.vy *= -1.2;
-                        ball.x += ball.vx; ball.y += ball.vy;
-                    }
+                    if (Math.hypot(ball.x - closestX, ball.y - closestY) < ball.r) { ball.vx *= -1.2; ball.vy *= -1.2; ball.x += ball.vx; ball.y += ball.vy; }
                 }
                 if (ob.type === 'block') {
                     const bx = ob.x*width, by = ob.y*height, bw = ob.w, bh = ob.h;
                     if (ball.x+ball.r > bx && ball.x-ball.r < bx+bw && ball.y+ball.r > by && ball.y-ball.r < by+bh) {
-                        const overlapL = (ball.x + ball.r) - bx;
-                        const overlapR = (bx + bw) - (ball.x - ball.r);
-                        const overlapT = (ball.y + ball.r) - by;
-                        const overlapB = (by + bh) - (ball.y - ball.r);
-                        const minOverlap = Math.min(overlapL, overlapR, overlapT, overlapB);
-
-                        if (minOverlap === overlapL) { ball.x = bx - ball.r; ball.vx *= -0.8; }
-                        else if (minOverlap === overlapR) { ball.x = bx + bw + ball.r; ball.vx *= -0.8; }
-                        else if (minOverlap === overlapT) { ball.y = by - ball.r; ball.vy *= -0.5; ball.vx *= 0.9; }
+                        const overlapL = (ball.x + ball.r) - bx, overlapR = (bx + bw) - (ball.x - ball.r), overlapT = (ball.y + ball.r) - by, overlapB = (by + bh) - (ball.y - ball.r);
+                        const min = Math.min(overlapL, overlapR, overlapT, overlapB);
+                        if (min === overlapL) { ball.x = bx - ball.r; ball.vx *= -0.8; }
+                        else if (min === overlapR) { ball.x = bx + bw + ball.r; ball.vx *= -0.8; }
+                        else if (min === overlapT) { ball.y = by - ball.r; ball.vy *= -0.5; ball.vx *= 0.9; }
                         else { ball.y = by + bh + ball.r; ball.vy *= -0.5; }
                     }
                 }
-                if (ob.type === 'spike') {
-                    if (ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5) resetStage();
-                }
+                if (ob.type === 'spike') { if (ball.x > ob.x*width && ball.x < ob.x*width + ob.w && ball.y + ball.r > gY - 5 && !ball.inHole) resetStage(); }
             });
 
             if (ball.y + ball.r > gY) {
@@ -128,7 +114,7 @@
                 if (ball.x + ball.r > hR) { ball.x = hR - ball.r; ball.vx *= -0.5; }
             }
 
-            if (ball.y > height + 50) { if (ball.inHole) { alert("STAGE CLEAR!"); currentStage = (currentStage + 1) % stages.length; } resetStage(); }
+            if (ball.y > height + 50) { if (ball.inHole) { alert("クリア！"); currentStage = (currentStage + 1) % stages.length; } resetStage(); }
             if (ball.x < -20 || ball.x > width + 20) resetStage();
             if (Math.hypot(ball.vx, ball.vy) < 0.2 && !ball.inHole) ball.moving = false;
         }
@@ -138,15 +124,17 @@
             const s = stages[currentStage];
             const gY = s.groundY * height, hL = s.holeX * width - s.holeW / 2, hW = s.holeW;
 
+            // 穴
             ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(hL, gY, hW, height - gY);
+            // 地面
             ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, gY, hL, height - gY); ctx.fillRect(hL + hW, gY, width, height - gY);
 
+            // 障害物
             s.obstacles.forEach(ob => {
                 if (ob.type === 'rotator') {
                     ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 10; ctx.lineCap = "round";
                     ctx.beginPath(); ctx.moveTo(ob.x * width, ob.y * height);
-                    ctx.lineTo(ob.x * width + Math.cos(ob.angle) * ob.length, ob.y * height + Math.sin(ob.angle) * ob.length);
-                    ctx.stroke();
+                    ctx.lineTo(ob.x * width + Math.cos(ob.angle) * ob.length, ob.y * height + Math.sin(ob.angle) * ob.length); ctx.stroke();
                 }
                 if (ob.type === 'block') { ctx.fillStyle = "#95a5a6"; ctx.fillRect(ob.x*width, ob.y*height, ob.w, ob.h); }
                 if (ob.type === 'spike') {
@@ -157,6 +145,7 @@
                 }
             });
 
+            // 予測線
             if (touch.start) {
                 let pv = { x: ball.x, y: ball.y, vx: (touch.start.x - touch.curr.x)*0.14, vy: (touch.start.y - touch.curr.y)*0.14 };
                 ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.setLineDash([5,5]); ctx.moveTo(pv.x, pv.y);
@@ -164,8 +153,10 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
+            // ボール（デザイン固定）
             ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
-            ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#000"; ctx.stroke();
+            ctx.fillStyle = "#fff"; ctx.fill();
+            ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.stroke();
 
             update();
             requestAnimationFrame(draw);
