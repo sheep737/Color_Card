@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pull Golf Master 20 - ver 4.0.0</title>
+    <title>Pull Golf Master 20 - ver 4.1.0</title>
     <style>
         * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body { margin: 0; padding: 0; overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; font-family: sans-serif; }
@@ -28,30 +28,39 @@
         let ball = { x: 0, y: 0, r: 13, vx: 0, vy: 0, moving: false, inHole: false };
         let touch = { start: null, curr: null };
 
-        // 全20ステージのデータ
         const stages = [];
-        for(let i=1; i<=20; i++) {
-            let s = { name: `Stage ${i}`, hint: "穴へ落とそう！", holeX: 0.7 + (Math.random()*0.2), holeW: 80 - (i*2), groundY: 0.8, obstacles: [] };
-            
-            // ステージごとの特徴付け
-            if(i === 1) s.obstacles.push({ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 });
-            else if(i === 2) s.obstacles.push({ type: 'rotator', x: 0.7, y: 0.4, length: 100, angle: 0, speed: 0.07 }, { type: 'spike', x: 0.2, y: 0.78, w: 100 });
-            else if(i === 3) s.obstacles.push({ type: 'block', x: 0.5, y: 0.2, w: 200, h: 30 }, { type: 'block', x: 0.7, y: 0.6, w: 20, h: 120 });
-            else if(i === 4) s.obstacles.push({ type: 'rotator', x: 0.4, y: 0.5, length: 80, angle: 0, speed: 0.05 }, { type: 'rotator', x: 0.7, y: 0.4, length: 80, angle: 1, speed: -0.06 });
-            else if(i === 5) s.obstacles.push({ type: 'block', x: 0.4, y: 0.4, w: 20, h: 300 }, { type: 'block', x: 0.7, y: 0.5, w: 20, h: 250 }, { type: 'spike', x: 0.42, y: 0.78, w: 150 });
-            else {
-                // 6〜20はランダム要素を混ぜつつ難易度上昇
-                if(i % 3 === 0) s.obstacles.push({ type: 'rotator', x: 0.5, y: 0.3, length: 150, angle: 0, speed: 0.05 + (i*0.005) });
-                if(i % 2 === 0) s.obstacles.push({ type: 'block', x: 0.3 + (i*0.02), y: 0.4, w: 30, h: 200 });
-                s.obstacles.push({ type: 'spike', x: 0.3, y: 0.78, w: 50 + (i*5) });
-                s.holeW = Math.max(40, 80 - (i*2)); // 穴がどんどん狭くなる
+        function initStages() {
+            stages.length = 0;
+            for(let i=1; i<=20; i++) {
+                let hX = 0.7 + (Math.random()*0.2); // 穴の位置
+                let hW = Math.max(45, 85 - (i * 2)); // 穴の幅
+                let s = { name: `Stage ${i}`, hint: "穴へ落とそう！", holeX: hX, holeW: hW, groundY: 0.8, obstacles: [] };
+                
+                // 穴の左端座標(比率)
+                let hL_ratio = hX - (hW/2)/width;
+
+                if(i === 1) s.obstacles.push({ type: 'block', x: 0.45, y: 0.5, w: 30, h: 250 });
+                else if(i === 2) s.obstacles.push({ type: 'rotator', x: 0.7, y: 0.4, length: 100, angle: 0, speed: 0.07 }, { type: 'spike', x: 0.2, y: 0.78, w: 100 });
+                else if(i === 3) s.obstacles.push({ type: 'block', x: 0.5, y: 0.2, w: 200, h: 30 }, { type: 'block', x: 0.7, y: 0.6, w: 20, h: 120 });
+                else {
+                    if(i % 3 === 0) s.obstacles.push({ type: 'rotator', x: 0.4, y: 0.3, length: 120, angle: 0, speed: 0.05 + (i*0.003) });
+                    if(i % 2 === 0) s.obstacles.push({ type: 'block', x: 0.4, y: 0.4, w: 25, h: 200 });
+                    
+                    // トゲの生成：穴の左端より必ず手前で終わるように計算
+                    let spikeStartX = 0.25;
+                    let maxSpikeW = (hX * width - hW/2 - 40) - (spikeStartX * width); 
+                    if(maxSpikeW > 20) {
+                        s.obstacles.push({ type: 'spike', x: spikeStartX, y: 0.78, w: Math.min(maxSpikeW, 50 + i*10) });
+                    }
+                }
+                stages.push(s);
             }
-            stages.push(s);
         }
 
         function resize() {
             width = window.innerWidth; height = window.innerHeight;
             canvas.width = width; canvas.height = height;
+            initStages(); // サイズ変更時に穴の位置計算を正確にするため再生成
             resetStage();
         }
 
@@ -61,7 +70,6 @@
             ball.vx = 0; ball.vy = 0; ball.moving = false; ball.inHole = false;
             document.getElementById('stNum').innerText = `${currentStage + 1} / ${stages.length}`;
             document.getElementById('stName').innerText = s.name;
-            document.getElementById('stHint').innerText = s.hint;
         }
 
         canvas.addEventListener('touchstart', e => { if(!ball.moving) { touch.start = { x: e.touches[0].clientX, y: e.touches[0].clientY }; touch.curr = touch.start; } }, {passive: false});
@@ -109,12 +117,8 @@
 
             if (ball.y > height + 50) { 
                 if (ball.inHole) {
-                    if (currentStage < stages.length - 1) {
-                        currentStage++; // 次のステージへ
-                    } else {
-                        alert("祝！20ステージ完全制覇！");
-                        currentStage = 0;
-                    }
+                    if (currentStage < stages.length - 1) { currentStage++; } 
+                    else { alert("祝！20ステージ完全制覇！"); currentStage = 0; }
                 }
                 resetStage();
             }
