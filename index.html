@@ -2,85 +2,97 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>シンプル・プル・ゴルフ</title>
+    <title>横視点プル・ゴルフ</title>
     <style>
-        body { text-align: center; background-color: #2c3e50; color: white; font-family: sans-serif; }
-        canvas { background-color: #2ecc71; border: 5px solid #27ae60; cursor: crosshair; touch-action: none; }
-        .ui { margin-top: 10px; }
+        body { text-align: center; background-color: #87CEEB; color: #333; font-family: sans-serif; margin: 0; overflow: hidden; }
+        canvas { background-color: #a2d2ff; border-bottom: 50px solid #2ecc71; cursor: crosshair; touch-action: none; }
+        .ui { position: absolute; top: 10px; width: 100%; pointer-events: none; }
     </style>
 </head>
 <body>
-    <h1>プル・ゴルフ</h1>
-    <canvas id="gameCanvas" width="800" height="500"></canvas>
     <div class="ui">
-        <p>ボールを引っ張って、穴（黒い円）に入れよう！</p>
-        <button onclick="resetGame()">リセット</button>
+        <h1>横視点ゴルフ</h1>
+        <p>画面をドラッグして放すと、ボールが飛びます！</p>
     </div>
+    <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        let ball = { x: 100, y: 400, radius: 15, vx: 0, vy: 0, isDragging: false };
-        let hole = { x: 700, y: 100, radius: 25 };
-        let mouse = { x: 0, y: 0 };
-        const friction = 0.98; // 摩擦
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        // マウスイベント
-        canvas.addEventListener('mousedown', startDrag);
-        canvas.addEventListener('mousemove', drag);
-        canvas.addEventListener('mouseup', endDrag);
+        let ball = { x: 100, y: 0, radius: 15, vx: 0, vy: 0 };
+        let hole = { x: canvas.width - 150, y: 0, radius: 30 };
+        let isDragging = false;
+        let startPos = { x: 0, y: 0 };
+        let currentPos = { x: 0, y: 0 };
 
-        function startDrag(e) {
+        const gravity = 0.5;   // 重力
+        const friction = 0.98; // 空気抵抗・摩擦
+        const bounce = -0.6;   // 跳ね返り係数
+        const groundY = canvas.height - 50; // 地面の高さ
+
+        ball.y = groundY - ball.radius;
+        hole.y = groundY;
+
+        // イベントリスナー（マウス・タッチ両対応）
+        canvas.addEventListener('mousedown', start);
+        canvas.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
+        canvas.addEventListener('touchstart', (e) => start(e.touches[0]));
+        canvas.addEventListener('touchmove', (e) => move(e.touches[0]));
+        window.addEventListener('touchend', end);
+
+        function start(e) {
             const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
-
-            // ボールの近くをクリックしたか判定
-            const dist = Math.hypot(mx - ball.x, my - ball.y);
-            if (dist < 30 && ball.vx === 0 && ball.vy === 0) {
-                ball.isDragging = true;
-            }
+            startPos.x = e.clientX - rect.left;
+            startPos.y = e.clientY - rect.top;
+            isDragging = true;
         }
 
-        function drag(e) {
+        function move(e) {
+            if (!isDragging) return;
             const rect = canvas.getBoundingClientRect();
-            mouse.x = e.clientX - rect.left;
-            mouse.y = e.clientY - rect.top;
+            currentPos.x = e.clientX - rect.left;
+            currentPos.y = e.clientY - rect.top;
         }
 
-        function endDrag() {
-            if (ball.isDragging) {
-                // 引っ張った方向の逆に飛ばす（アングリーバード方式）
-                ball.vx = (ball.x - mouse.x) * 0.15;
-                ball.vy = (ball.y - mouse.y) * 0.15;
-                ball.isDragging = false;
-            }
+        function end() {
+            if (!isDragging) return;
+            // 引っ張ったベクトルの逆方向に力を加える
+            ball.vx = (startPos.x - currentPos.x) * 0.15;
+            ball.vy = (startPos.y - currentPos.y) * 0.15;
+            isDragging = false;
         }
 
         function update() {
-            if (!ball.isDragging) {
+            if (!isDragging) {
+                // 重力と移動
+                ball.vy += gravity;
                 ball.x += ball.vx;
                 ball.y += ball.vy;
 
-                // 摩擦
-                ball.vx *= friction;
-                ball.vy *= friction;
+                // 地面の衝突
+                if (ball.y + ball.radius > groundY) {
+                    ball.y = groundY - ball.radius;
+                    ball.vy *= bounce;
+                    ball.vx *= friction; // 地面との摩擦
+                }
 
-                // 停止判定
-                if (Math.abs(ball.vx) < 0.1) ball.vx = 0;
-                if (Math.abs(ball.vy) < 0.1) ball.vy = 0;
-
-                // 壁の反射
-                if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) ball.vx *= -0.7;
-                if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) ball.vy *= -0.7;
+                // 壁の衝突
+                if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                    ball.vx *= bounce;
+                    ball.x = ball.x < ball.radius ? ball.radius : canvas.width - ball.radius;
+                }
             }
 
-            // クリア判定
+            // クリア判定（穴に入ったか）
             const distToHole = Math.hypot(ball.x - hole.x, ball.y - hole.y);
-            if (distToHole < hole.radius && Math.abs(ball.vx) < 2) {
-                alert("ホールインワン！おめでとう！");
-                resetGame();
+            if (distToHole < hole.radius && Math.abs(ball.vy) < 5) {
+                alert("ナイスイン！");
+                reset();
             }
         }
 
@@ -88,24 +100,34 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // 穴
-            ctx.beginPath();
-            ctx.arc(hole.x, hole.y, hole.radius, 0, Math.PI * 2);
             ctx.fillStyle = "black";
+            ctx.beginPath();
+            ctx.arc(hole.x, hole.y, hole.radius, Math.PI, 0); // 半円
             ctx.fill();
-            ctx.closePath();
 
-            // 旗（簡易）
+            // 旗
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(hole.x, hole.y);
+            ctx.lineTo(hole.x, hole.y - 80);
+            ctx.stroke();
             ctx.fillStyle = "red";
-            ctx.fillRect(hole.x, hole.y - 60, 30, 20);
-            ctx.strokeStyle = "white";
-            ctx.strokeRect(hole.x, hole.y - 60, 1, 60);
+            ctx.beginPath();
+            ctx.moveTo(hole.x, hole.y - 80);
+            ctx.lineTo(hole.x + 30, hole.y - 65);
+            ctx.lineTo(hole.x, hole.y - 50);
+            ctx.fill();
 
-            // 引っ張る線のガイド
-            if (ball.isDragging) {
+            // 軌道予測ライン（ドラッグ中のみ表示）
+            if (isDragging) {
                 ctx.beginPath();
                 ctx.moveTo(ball.x, ball.y);
-                ctx.lineTo(mouse.x, mouse.y);
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                // 引っ張った強さを可視化
+                const targetX = ball.x + (startPos.x - currentPos.x);
+                const targetY = ball.y + (startPos.y - currentPos.y);
+                ctx.lineTo(targetX, targetY);
+                ctx.strokeStyle = "white";
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
                 ctx.setLineDash([]);
@@ -116,17 +138,17 @@
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fillStyle = "white";
             ctx.fill();
-            ctx.strokeStyle = "#999";
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 1;
             ctx.stroke();
-            ctx.closePath();
 
             update();
             requestAnimationFrame(draw);
         }
 
-        function resetGame() {
+        function reset() {
             ball.x = 100;
-            ball.y = 400;
+            ball.y = groundY - ball.radius;
             ball.vx = 0;
             ball.vy = 0;
         }
